@@ -778,7 +778,7 @@ const execData=[
   {name:'Luke Salazar',role:'Design Lead / Co-CEO',img:'luke.png',desc:'Luke leads mechanical design and co-directs overall engineering strategy.'},
   {name:'Jack Jackson',role:'Electrical Lead / Co-CEO',img:'jack.png',desc:'Jack heads electrical systems and co-directs overall engineering strategy.'},
   {name:'Justin Lu',role:'Programming Lead / Surface Side Lead',img:'justin.png',desc:'Justin leads software development, control systems, and surface-side operations.'},
-  {name:'Amar Malhi'role:'Prosthetics Project Manager/MESA Ambassador',img:'amar.png',desc:'Amar oversees the entire prosthetics team and bridges the gap between biology and engineering specialists.'}
+  {name:'Amar Malhi',role:'MESA Ambassador / Prosthetics Project Manager',img:'amar.png',desc:'Amar oversees the prosthetics project and bridges the gap between biology and engineering specialists.'}
 
 ];
 const advisorData=[
@@ -852,9 +852,10 @@ function renderAll(){
 
     </div>`).join('');
 
-  // Exec board: 3x3 grid
+  // Exec board: 1x2 top, then 2x3, remaining in extra row
   document.getElementById('exec-rows').innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:20px">${execData.map((e,i)=>personCard(e,i,false)).join('')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;max-width:760px;margin-left:auto;margin-right:auto">${execData.slice(0,2).map((e,i)=>personCard(e,i,true)).join('')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:20px">${execData.slice(2).map((e,i)=>personCard(e,i+2,false)).join('')}</div>
     <div style="margin-top:64px;border-top:1px solid rgba(255,255,255,.06);padding-top:48px">
 
       <div class="reveal"><div class="display" style="font-size:1.8rem;font-weight:700;color:#fff;margin-bottom:8px;text-transform:uppercase">Club <span style="color:var(--sky)">Advisors</span></div>
