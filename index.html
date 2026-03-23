@@ -121,6 +121,17 @@ nav.solid .nav-inner{height:56px}
 .photo-grid{display:grid;gap:12px}
 .photo-grid.g2{grid-template-columns:1fr 1fr}
 .photo-grid.g3{grid-template-columns:1fr 1fr 1fr}
+.carousel{position:relative;border-radius:12px;overflow:hidden;background:var(--fog)}
+.carousel-track{display:flex;transition:transform .4s cubic-bezier(.4,0,.2,1)}
+.carousel-slide{min-width:100%;overflow:hidden}
+.carousel-slide img{width:100%;height:100%;object-fit:cover;display:block}
+.carousel-btn{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.45);color:#fff;border:none;cursor:pointer;width:34px;height:34px;border-radius:50%;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:5;backdrop-filter:blur(4px);transition:background .2s}
+.carousel-btn:hover{background:rgba(0,0,0,.7)}
+.carousel-btn.prev{left:10px}
+.carousel-btn.next{right:10px}
+.carousel-dots{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:5}
+.carousel-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.35);cursor:pointer;transition:background .2s;border:none;padding:0}
+.carousel-dot.active{background:#fff}
 footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.04)}
 .footer-inner{max-width:1100px;margin:0 auto;padding:64px 40px 28px}
 .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:48px;margin-bottom:48px}
@@ -412,23 +423,9 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.04)}
             <span class="tag" style="border:1px solid rgba(171,225,224,.3);color:var(--mist)">3D Modeling</span>
           </div>
         </div>
-        <div>
-          <div class="photo-slot light" style="aspect-ratio:4/5;border-radius:12px"><img src="project-intro-1.jpg" alt="Intro project work" onerror="this.parentElement.innerHTML='<div style=display:flex;align-items:center;justify-content:center;height:100%;color:var(--ash);font-size:14px;text-align:center;padding:20px>Intro Projects<br>Photo</div>'"></div>
-        </div>
+        <div id="carousel-intro"></div>
       </div>
 
-    </div>
-  </section>
-
-
-  <!-- Intro project photos -->
-  <section style="padding:0 40px 60px;background:var(--white)">
-    <div style="max-width:1100px;margin:0 auto" class="reveal">
-      <div class="photo-grid g3">
-        <div class="photo-slot light" style="aspect-ratio:4/3"><img src="project-intro-2.jpg" alt="Arduino wiring" onerror="this.parentElement.style.display='none'"></div>
-        <div class="photo-slot light" style="aspect-ratio:4/3"><img src="project-intro-3.jpg" alt="CAD modeling" onerror="this.parentElement.style.display='none'"></div>
-        <div class="photo-slot light" style="aspect-ratio:4/3"><img src="project-intro-4.jpg" alt="Group collaboration" onerror="this.parentElement.style.display='none'"></div>
-      </div>
     </div>
   </section>
 
@@ -443,9 +440,7 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.04)}
         <span class="sharp" style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--forest)">Leveling Up</span>
       </div>
       <div class="split reveal">
-        <div>
-          <div class="photo-slot light" style="aspect-ratio:4/5;border-radius:12px"><img src="project-halloween-1.jpg" alt="Halloween project" onerror="this.parentElement.innerHTML='<div style=display:flex;align-items:center;justify-content:center;height:100%;color:var(--ash);font-size:14px;text-align:center;padding:20px>Halloween Projects<br>Photo</div>'"></div>
-        </div>
+        <div id="carousel-halloween"></div>
         <div>
 
           <h2 class="display" style="font-size:2.6rem;font-weight:700;color:var(--ink);line-height:1.05;margin-bottom:18px;text-transform:uppercase">Halloween Projects</h2>
@@ -462,15 +457,6 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.04)}
     </div>
   </section>
 
-  <!-- Halloween project photos -->
-  <section style="padding:0 40px 60px;background:var(--white)">
-    <div style="max-width:1100px;margin:0 auto" class="reveal">
-      <div class="photo-grid g2">
-        <div class="photo-slot light" style="aspect-ratio:16/10"><img src="project-halloween-2.jpg" alt="Halloween build" onerror="this.parentElement.style.display='none'"></div>
-        <div class="photo-slot light" style="aspect-ratio:16/10"><img src="project-halloween-3.jpg" alt="Halloween demo" onerror="this.parentElement.style.display='none'"></div>
-      </div>
-    </div>
-  </section>
 
   <!-- More projects coming -->
 
@@ -546,11 +532,7 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.04)}
   <!-- Competition photos -->
   <section style="padding:0 40px 60px;background:var(--white)">
     <div style="max-width:1100px;margin:0 auto" class="reveal">
-      <div class="photo-grid g3">
-        <div class="photo-slot light" style="aspect-ratio:4/3"><img src="competition-1.jpg" alt="At competition" onerror="this.parentElement.style.display='none'"></div>
-        <div class="photo-slot light" style="aspect-ratio:4/3"><img src="competition-2.jpg" alt="Award ceremony" onerror="this.parentElement.style.display='none'"></div>
-        <div class="photo-slot light" style="aspect-ratio:4/3"><img src="competition-3.jpg" alt="Team at event" onerror="this.parentElement.style.display='none'"></div>
-      </div>
+      <div id="carousel-crushdepth"></div>
     </div>
   </section>
 
@@ -617,25 +599,13 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.04)}
           <p style="font-size:15px;color:var(--slate);line-height:1.85;margin-bottom:20px">An interdisciplinary project where biology and engineering majors collaborate to design and build a robotic prosthetic hand controlled by EEG brain signals — created for amputees in need. This partnership between Engineering Renaissance, the MEDLIFE Club, and MESA represents exactly what happens when disciplines converge on a problem that matters.</p>
           <p style="font-size:14px;color:var(--ash);line-height:1.7">Engineering students handle the embedded systems, signal processing, and mechanical design. Biology and pre-med students from MEDLIFE bring the neuroscience and human factors expertise. MESA provides the framework for underrepresented students to participate in cutting-edge research.</p>
         </div>
-        <div>
-          <div class="photo-slot light" style="aspect-ratio:4/5;border-radius:12px"><img src="eeg-prosthetic-1.jpg" alt="EEG prosthetic hand project" onerror="this.parentElement.innerHTML='<div style=display:flex;align-items:center;justify-content:center;height:100%;color:var(--ash);font-size:14px;text-align:center;padding:20px>EEG Prosthetic Hand<br>Project Photo</div>'"></div>
-        </div>
+        <div id="carousel-prosthetic"></div>
 
       </div>
     </div>
 
   </section>
 
-  <!-- EEG project photos -->
-  <section style="padding:0 40px 60px;background:var(--white)">
-    <div style="max-width:1100px;margin:0 auto" class="reveal">
-      <div class="photo-grid g3">
-        <div class="photo-slot light" style="aspect-ratio:4/3"><img src="eeg-collab-1.jpg" alt="Cross-discipline collaboration" onerror="this.parentElement.style.display='none'"></div>
-        <div class="photo-slot light" style="aspect-ratio:4/3"><img src="eeg-collab-2.jpg" alt="EEG signal testing" onerror="this.parentElement.style.display='none'"></div>
-        <div class="photo-slot light" style="aspect-ratio:4/3"><img src="eeg-collab-3.jpg" alt="Prosthetic assembly" onerror="this.parentElement.style.display='none'"></div>
-      </div>
-    </div>
-  </section>
 
   <!-- Broader impact -->
   <section style="padding:100px 40px;background:var(--ink)">
@@ -830,7 +800,37 @@ function personCard(e,i,large){
   </div>`;
 }
 
+// ── Carousel image arrays ── add filenames here to grow each carousel ──
+const carouselImgs={
+  intro:      ['project-intro-1.jpg','project-intro-2.jpg','project-intro-3.jpg','project-intro-4.jpg'],
+  halloween:  ['project-halloween-1.jpg','project-halloween-2.jpg','project-halloween-3.jpg'],
+  crushdepth: ['competition-1.jpg','competition-2.jpg','competition-3.jpg'],
+  prosthetic: ['eeg-prosthetic-1.jpg','eeg-collab-1.jpg','eeg-collab-2.jpg','eeg-collab-3.jpg'],
+};
+
+const _carState={};
+function makeCarousel(id,imgs,ratio){
+  if(!imgs||!imgs.length)return'';
+  _carState[id]={idx:0,n:imgs.length};
+  const slides=imgs.map(src=>`<div class="carousel-slide" style="aspect-ratio:${ratio}"><img src="${src}" alt=""></div>`).join('');
+  const dots=imgs.length>1?`<div class="carousel-dots">${imgs.map((_,i)=>`<button class="carousel-dot${i===0?' active':''}" onclick="carouselGo('${id}',${i})"></button>`).join('')}</div>`:'';
+  const btns=imgs.length>1?`<button class="carousel-btn prev" onclick="carouselStep('${id}',-1)">&#8249;</button><button class="carousel-btn next" onclick="carouselStep('${id}',1)">&#8250;</button>`:'';
+  return`<div class="carousel" id="${id}"><div class="carousel-track" id="${id}-track">${slides}</div>${btns}${dots}</div>`;
+}
+function carouselGo(id,i){
+  const s=_carState[id];if(!s)return;
+  s.idx=((i%s.n)+s.n)%s.n;
+  document.getElementById(id+'-track').style.transform=`translateX(-${s.idx*100}%)`;
+  document.querySelectorAll(`#${id} .carousel-dot`).forEach((d,j)=>d.classList.toggle('active',j===s.idx));
+}
+function carouselStep(id,dir){const s=_carState[id];if(s)carouselGo(id,s.idx+dir);}
+
 function renderAll(){
+  document.getElementById('carousel-intro').innerHTML=makeCarousel('carousel-intro',carouselImgs.intro,'4/5');
+  document.getElementById('carousel-halloween').innerHTML=makeCarousel('carousel-halloween',carouselImgs.halloween,'4/5');
+  document.getElementById('carousel-crushdepth').innerHTML=makeCarousel('carousel-crushdepth',carouselImgs.crushdepth,'16/9');
+  document.getElementById('carousel-prosthetic').innerHTML=makeCarousel('carousel-prosthetic',carouselImgs.prosthetic,'4/5');
+
   document.getElementById('home-values').innerHTML=numberedRows(homeValues);
   document.getElementById('about-values').innerHTML=numberedRows(values);
   document.getElementById('impact-rows').innerHTML=numberedRows(impactRows);
