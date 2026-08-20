@@ -159,8 +159,9 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.04)}
   .perf-split{grid-template-columns:1fr!important}
   .perf-split>div:first-child{border-right:none!important;border-bottom:1px solid rgba(255,255,255,.06)!important;padding:32px 0!important}
   .perf-split>div:last-child{padding:32px 0!important}
-  #exec-rows .exec-top{grid-template-columns:1fr!important}
-  #exec-rows .exec-bottom{grid-template-columns:1fr 1fr!important}
+  #exec-rows .exec-top,#admin-rows .exec-top,#advisor-rows .exec-top{grid-template-columns:1fr!important}
+  #exec-rows .exec-bottom,#admin-rows .exec-bottom,#advisor-rows .exec-bottom{grid-template-columns:1fr 1fr!important}
+  .person-flex>div{flex:0 0 calc(50% - 10px)!important}
 }
 @media(min-width:801px){.hamburger{display:none!important}}
 </style>
@@ -357,6 +358,8 @@ footer{background:var(--ink);border-top:1px solid rgba(255,255,255,.04)}
         <p style="font-size:14px;color:rgba(255,255,255,.35);margin-bottom:48px">Meet the leadership team driving Engineering Renaissance forward</p>
       </div>
       <div id="exec-rows"></div>
+      <div id="admin-rows"></div>
+      <div id="advisor-rows"></div>
     </div>
   </section>
 
@@ -739,17 +742,18 @@ const subteamData=[
   {title:'Media',desc:'Documentation, photography, video production, and social media',tags:['Content Creation','Social Media','Documentation'],c:'var(--mist)'},
 ];
 const execData=[
-  {name:'Daniel Larralde',role:'President',img:'daniel.png',desc:'Daniel oversees & leads Engineering Renaissance, ensuring success on all levels.'},
-  {name:'Julia Taylor',role:'Vice President / CSO',img:'julia.png',desc:'Julia organizes team workflows and supports communication across all teams.'},
-  {name:'Santino Gonzales',role:'Treasurer / CLO',img:'santino.png',desc:'Santino manages club finances and handles legal and compliance operations.'},
-  {name:'Keira Batulayan',role:'Secretary',img:'keira.png',desc:'Keira manages club records, coordinates meeting notes, and keeps communications organized across the team.'},
-  {name:'Irery Huerta',role:'Marketing Lead',img:'irery.png',desc:'Irery drives brand strategy, content campaigns, and public-facing communications.'},
-  {name:'Emily Brereton',role:'CMO',img:'emily.png',desc:"Emily oversees all marketing operations and directs the club's outreach presence."},
-  {name:'Luke Salazar',role:'Design Lead / Co-CEO',img:'luke.png',desc:'Luke leads mechanical design and co-directs overall engineering strategy.'},
-  {name:'Jack Jackson',role:'Electrical Lead / Co-CEO',img:'jack.png',desc:'Jack heads electrical systems and co-directs overall engineering strategy.'},
-  {name:'Justin Lu',role:'Programming Lead / Surface Side Lead',img:'justin.png',desc:'Justin leads software development, control systems, and surface-side operations.'},
-  {name:'Amar Malhi',role:'MESA Ambassador / Prosthetics Project Manager',img:'amar.png',desc:'Amar oversees the prosthetics project and bridges the gap between biology and engineering specialists.'}
-
+  {name:'Lamin Tun',role:'President',img:'daniel.png',desc:'Daniel oversees & leads Engineering Renaissance, ensuring success on all levels.'},
+  {name:'Isaac Perry',role:'Vice President',img:'julia.png',desc:'Julia organizes team workflows and supports communication across all teams.'},
+  {name:'Santino Gonzales',role:'Treasurer',img:'santino.png',desc:'Santino manages club finances and handles legal and compliance operations.'},
+  {name:'Keira Batulayan',role:'Secretary',img:'keira.png',desc:'Keira manages club records, coordinates meeting notes, and keeps communications organized across the team.'}, 
+];
+const adminData=[
+  {name:'Sameeha Suliman',role:'CEO of Crush Depth | Director of Manufacturing',img:'Sameeha.png',desc:''},
+  {name:'Sophie Morales',role:'Director of Marketing | CMO of Crush Depth',img:'Sophie.png',desc:''},
+  {name:'Kevin Yazon',role:'Director of Design | CDO of Crush Depth',img:'Kevin.png',desc:''},
+  {name:'Jhan Padua',role:'Director of Hardware | CTO of Crush Depth',img:'Jhan.png',desc:''},
+  {name:'Jackson Cook',role:'Director of Software',img:'Jackson.png',desc:''},
+  {name:' ',role:'Director of Safety',img:'admin6.png',desc:' '},
 ];
 const advisorData=[
   {name:'Benjamin Bohan, M.S.',img:'benjamin.png',desc:'Club advisor providing guidance and institutional support for Engineering Renaissance.'},
@@ -855,12 +859,22 @@ function renderAll(){
   // Exec board: 1x2 top, then 2x3, remaining in extra row
   document.getElementById('exec-rows').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;max-width:760px;margin-left:auto;margin-right:auto">${execData.slice(0,2).map((e,i)=>personCard(e,i,true)).join('')}</div>
-    <div style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center;margin-bottom:20px">${execData.slice(2).map((e,i)=>`<div style="flex:0 0 calc(33.33% - 14px);min-width:0">${personCard(e,i+2,false)}</div>`).join('')}</div>
-    <div style="margin-top:64px;border-top:1px solid rgba(255,255,255,.06);padding-top:48px">
+    <div class="person-flex" style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center;margin-bottom:20px">${execData.slice(2).map((e,i)=>`<div style="flex:0 0 calc(33.33% - 14px);min-width:0">${personCard(e,i+2,false)}</div>`).join('')}</div>`;
 
+  // Administrative board
+  document.getElementById('admin-rows').innerHTML=`
+    <div style="margin-top:64px;border-top:1px solid rgba(255,255,255,.06);padding-top:48px">
+      <div class="reveal"><div class="display" style="font-size:1.8rem;font-weight:700;color:#fff;margin-bottom:8px;text-transform:uppercase">Administrative <span style="color:var(--teal)">Board</span></div>
+      <p style="font-size:14px;color:rgba(255,255,255,.35);margin-bottom:32px">The administrative team keeping Engineering Renaissance running</p></div>
+      <div class="person-flex" style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center">${adminData.map((a,i)=>`<div style="flex:0 0 calc(33.33% - 14px);min-width:0">${personCard(a,i,false)}</div>`).join('')}</div>
+    </div>`;
+
+  // Club advisors
+  document.getElementById('advisor-rows').innerHTML=`
+    <div style="margin-top:64px;border-top:1px solid rgba(255,255,255,.06);padding-top:48px">
       <div class="reveal"><div class="display" style="font-size:1.8rem;font-weight:700;color:#fff;margin-bottom:8px;text-transform:uppercase">Club <span style="color:var(--sky)">Advisors</span></div>
       <p style="font-size:14px;color:rgba(255,255,255,.35);margin-bottom:32px">Faculty mentors guiding Engineering Renaissance</p></div>
-      <div class="exec-top" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:600px">${advisorData.map((a,i)=>{a.role='Faculty Advisor';return personCard(a,i+8,false)}).join('')}</div>
+      <div class="exec-top" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:600px">${advisorData.map((a,i)=>{a.role='Faculty Advisor';return personCard(a,i,false)}).join('')}</div>
     </div>`;
 
 
