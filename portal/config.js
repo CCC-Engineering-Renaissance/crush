@@ -8,11 +8,11 @@
 
 export default {
   firebase: {
-    apiKey: 'AIzaSyD9Yd7db8vl2KiTZN-7SMSyNM4oUvUKmR8',
-    authDomain: 'er-portal-19d4a.firebaseapp.com',        // e.g. 'er-portal.firebaseapp.com'
-    projectId: 'er-portal-19d4a',         // e.g. 'er-portal'
-    appId: '1:152424240260:web:4f604115d2b05114695ed1',
-    messagingSenderId: '152424240260',
+    apiKey: '',
+    authDomain: '',        // e.g. 'er-portal.firebaseapp.com'
+    projectId: '',         // e.g. 'er-portal'
+    appId: '',
+    messagingSenderId: '',
   },
 
   // Google Drive file picker and "Export to Google Sheets" (SETUP.md, step 5). Optional:
