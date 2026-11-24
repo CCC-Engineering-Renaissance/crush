@@ -1,0 +1,309 @@
+rules_version = '2';
+
+// Engineering Renaissance member portal — Firestore security rules.
+//
+// These rules are the real security boundary: the website's code is public, so every
+// read and write is checked here, on Google's servers.
+//
+// Roles live on users/{uid}:
+//   status: 'pending' | 'active' | 'inactive' | 'denied'
+//   role:   'member' | 'lead' | 'admin'
+// Only active users can see anything beyond their own profile.
+// Leads (officers, subteam leads) review hours, run reports, post announcements and events.
+// Admins also manage members, roles, subteams, spaces and settings.
+//
+// Bootstrap: create invites/{your-email-lowercase} with role 'admin' in the Firebase console,
+// then sign in to the portal. See SETUP.md.
+//
+// The portal writes in small batches (8 or fewer documents) because every write here looks up
+// the signer's profile, and Firestore allows 20 such lookups per batched write.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ───────────── helpers ─────────────
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function userDoc(u) { return /databases/$(database)/documents/users/$(u); }
+    function inviteDoc(e) { return /databases/$(database)/documents/invites/$(e); }
+    function settingsDoc() { return /databases/$(database)/documents/config/settings; }
+    function presenceDoc(u) { return /databases/$(database)/documents/presence/$(u); }
+    function entryDoc(e) { return /databases/$(database)/documents/timeEntries/$(e); }
+    function spaceDoc(s) { return /databases/$(database)/documents/spaces/$(s); }
+    function hasProfile() { return signedIn() && exists(userDoc(uid())); }
+    function me() { return get(userDoc(uid())).data; }
+    function active() { return hasProfile() && me().status == 'active'; }
+    function lead() { return active() && me().role in ['lead', 'admin']; }
+    function admin() { return active() && me().role == 'admin'; }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function changedKeys() { return incoming().diff(existing()).affectedKeys(); }
+    function onlyChanged(keys) { return changedKeys().hasOnly(keys); }
+
+    function str(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
+    function optStr(m, k, max) { return !(k in m) || m[k] == null || (m[k] is string && m[k].size() <= max); }
+    function optList(m, k, max) { return !(k in m) || (m[k] is list && m[k].size() <= max); }
+    function emailKey() { return request.auth.token.email.lower(); }
+
+    // Longest session a member can close without a lead's approval (config/settings.maxSessionHours).
+    function maxSessionHours() {
+      return exists(settingsDoc()) ? get(settingsDoc()).data.get('maxSessionHours', 10) : 10;
+    }
+
+    // ───────────── members ─────────────
+    function httpsLink(m, k) { return !(k in m) || (m[k] is string && m[k].size() <= 300 && m[k].matches('https://[^\\s]+')); }
+    function validProfile(d) {
+      return str(d.name, 1, 80)
+        && optStr(d, 'pronouns', 30) && optStr(d, 'major', 80) && optStr(d, 'bio', 1000)
+        && optStr(d, 'joinNote', 1000) && optStr(d, 'photoURL', 2000)
+        && optList(d, 'skills', 25) && optList(d, 'subteams', 10)
+        && (!('links' in d) || (d.links is map && d.links.keys().hasOnly(['linkedin', 'github', 'website'])
+            && httpsLink(d.links, 'linkedin') && httpsLink(d.links, 'github') && httpsLink(d.links, 'website')));
+    }
+    function inviteFor() { return get(inviteDoc(emailKey())).data; }
+
+    match /users/{userId} {
+      // Pending applicants are visible only to themselves and to leads.
+      allow read: if signedIn() && (userId == uid() || lead() || (active() && resource.data.status == 'active'));
+
+      allow create: if signedIn() && userId == uid()
+        && request.auth.token.email_verified == true
+        && incoming().keys().hasOnly(['uid', 'email', 'name', 'photoURL', 'role', 'status', 'subteams',
+             'title', 'pronouns', 'major', 'bio', 'skills', 'links', 'joinNote', 'createdAt'])
+        && incoming().uid == uid()
+        && incoming().email == request.auth.token.email
+        && incoming().createdAt == request.time
+        && validProfile(incoming())
+        && (
+          // Anyone with a Google account may ask to join; an officer approves them.
+          (incoming().status == 'pending' && incoming().role == 'member' && incoming().title == '')
+          ||
+          // People an admin invited by email get the invited role right away.
+          (exists(inviteDoc(emailKey()))
+            && incoming().status == 'active'
+            && incoming().role == inviteFor().role
+            && incoming().title == inviteFor().get('title', '')
+            && incoming().subteams == inviteFor().get('subteams', []))
+        );
+
+      allow update: if
+        // Members edit their own profile, never their role or status.
+        (userId == uid() && hasProfile()
+          && onlyChanged(['name', 'photoURL', 'pronouns', 'major', 'bio', 'skills', 'links', 'joinNote', 'subteams'])
+          && validProfile(incoming()))
+        ||
+        // Admins manage role, status, title and everything else.
+        (admin() && incoming().uid == existing().uid && incoming().email == existing().email
+          && incoming().role in ['member', 'lead', 'admin']
+          && incoming().status in ['pending', 'active', 'inactive', 'denied']
+          && validProfile(incoming()));
+
+      allow delete: if admin();
+    }
+
+    match /invites/{email} {
+      allow read: if admin() || (signedIn() && email == emailKey());
+      allow create, update: if admin()
+        && email == email.lower()
+        && incoming().role in ['member', 'lead', 'admin']
+        && incoming().subteams is list && incoming().title is string;
+      allow delete: if admin();
+    }
+
+    // ───────────── settings & reference data ─────────────
+    match /config/{docId} {
+      allow read: if active();
+      allow write: if admin();
+    }
+    match /subteams/{id} {
+      allow read: if signedIn();   // names only; shown on the join form
+      allow write: if admin();
+    }
+    match /activities/{id} {
+      allow read: if active();
+      allow write: if lead();
+    }
+
+    // ───────────── time tracking ─────────────
+    // A session is a timeEntries doc. While someone is clocked in, presence/{uid} points at
+    // their open session. Clock-in and clock-out are batched writes, and both use the server's
+    // clock (request.time), so nobody can backdate a session from their phone.
+    function validDetails(d) {
+      return (d.activityId == null || str(d.activityId, 1, 60))
+        && (d.subteamId == null || str(d.subteamId, 1, 60))
+        && (!('eventId' in d) || d.eventId == null || str(d.eventId, 1, 60))
+        && optStr(d, 'note', 500) && optStr(d, 'outNote', 500)
+        && (!('geo' in d) || d.geo == null || d.geo in ['on-site', 'off-site', 'unknown']);
+    }
+    function presenceAfter() { return getAfter(presenceDoc(uid())).data; }
+
+    match /presence/{userId} {
+      allow read: if active();
+
+      // Clock in: only while creating the matching open session in the same batch.
+      allow create: if active() && userId == uid()
+        && incoming().keys().hasOnly(['uid', 'entryId', 'start', 'name', 'photoURL', 'activityId', 'subteamId'])
+        && incoming().uid == uid()
+        && incoming().start == request.time
+        && incoming().name == me().name
+        && incoming().photoURL == me().get('photoURL', null)
+        && getAfter(entryDoc(incoming().entryId)).data.uid == uid()
+        && getAfter(entryDoc(incoming().entryId)).data.status == 'open';
+
+      // Clock out: only while closing the session in the same batch. Leads can clear anyone.
+      allow delete: if active() && (
+        lead()
+        || (userId == uid() && getAfter(entryDoc(resource.data.entryId)).data.status != 'open')
+      );
+    }
+
+    match /timeEntries/{entryId} {
+      allow read: if active() && (resource.data.uid == uid() || lead());
+
+      allow create: if active() && (
+        // Clock in from your own phone.
+        (incoming().source == 'clock'
+          && incoming().keys().hasOnly(['uid', 'name', 'start', 'end', 'status', 'source', 'activityId',
+               'subteamId', 'eventId', 'note', 'geo', 'createdAt'])
+          && incoming().uid == uid()
+          && incoming().name == me().name
+          && incoming().start == request.time
+          && incoming().createdAt == request.time
+          && incoming().end == null
+          && incoming().status == 'open'
+          && validDetails(incoming())
+          && !exists(presenceDoc(uid()))
+          && presenceAfter().entryId == entryId)
+        ||
+        // A lead adds a session for someone (forgot their phone, outreach event, etc.).
+        (lead() && incoming().source == 'lead'
+          && (incoming().uid != uid() || admin())
+          && incoming().keys().hasOnly(['uid', 'name', 'start', 'end', 'status', 'source', 'activityId',
+               'subteamId', 'eventId', 'note', 'outNote', 'geo', 'createdAt', 'editedBy', 'editedAt', 'reviewNote'])
+          && str(incoming().uid, 1, 128) && str(incoming().name, 1, 80)
+          && incoming().start is timestamp && incoming().end is timestamp
+          && incoming().end > incoming().start
+          && incoming().end <= request.time + duration.value(1, 'h')
+          && incoming().status == 'complete'
+          && incoming().createdAt == request.time
+          && incoming().editedBy == uid() && incoming().editedAt == request.time
+          && validDetails(incoming()))
+      );
+
+      allow update: if active() && (
+        // Clock out, within the club's maximum session length.
+        (existing().uid == uid() && existing().status == 'open'
+          && onlyChanged(['end', 'status', 'outNote', 'activityId', 'subteamId', 'note'])
+          && incoming().end == request.time
+          && incoming().status == 'complete'
+          && request.time <= existing().start + duration.value(maxSessionHours(), 'h')
+          && validDetails(incoming())
+          && !existsAfter(presenceDoc(uid())))
+        ||
+        // Forgot to clock out: propose the real end time; a lead approves it.
+        (existing().uid == uid() && existing().status == 'open'
+          && onlyChanged(['end', 'status', 'fix', 'outNote'])
+          && incoming().status == 'pending'
+          && incoming().end is timestamp
+          && incoming().end > existing().start
+          && incoming().end <= request.time
+          && incoming().end <= existing().start + duration.value(16, 'h')
+          && incoming().fix is map
+          && incoming().fix.keys().hasOnly(['reason', 'requestedAt'])
+          && str(incoming().fix.reason, 3, 500)
+          && incoming().fix.requestedAt == request.time
+          && optStr(incoming(), 'outNote', 500)
+          && !existsAfter(presenceDoc(uid())))
+        ||
+        // Change what you worked on. Times and status stay locked.
+        (existing().uid == uid() && existing().status != 'rejected'
+          && onlyChanged(['activityId', 'subteamId', 'note', 'outNote', 'eventId'])
+          && validDetails(incoming()))
+        ||
+        // Leads review fixes and correct sessions. Every lead edit is stamped.
+        // Leads can't approve their own sessions; an admin can.
+        (lead()
+          && (existing().uid != uid() || admin())
+          && incoming().uid == existing().uid
+          && incoming().source == existing().source
+          && incoming().editedBy == uid() && incoming().editedAt == request.time
+          && incoming().status in ['open', 'complete', 'pending', 'rejected']
+          && (incoming().end == null || (incoming().end is timestamp && incoming().end > incoming().start))
+          && validDetails(incoming()))
+      );
+
+      allow delete: if admin();
+    }
+
+    // ───────────── club content ─────────────
+    match /events/{id} {
+      allow read: if active();
+      allow create, update: if lead() && str(incoming().title, 1, 140)
+        && incoming().start is timestamp && incoming().end is timestamp && incoming().end >= incoming().start;
+      allow delete: if lead();
+    }
+
+    match /announcements/{id} {
+      allow read: if active();
+      allow create: if lead() && str(incoming().title, 1, 160) && str(incoming().body, 0, 8000)
+        && incoming().authorUid == uid() && incoming().authorName == me().name;
+      allow update: if lead() && str(incoming().title, 1, 160) && str(incoming().body, 0, 8000);
+      allow delete: if lead();
+    }
+
+    // Spaces hold pages and a task board. space.tree is the page outline shown in the sidebar.
+    function spaceData(s) { return get(spaceDoc(s)).data; }
+    function canEditSpace(s) { return lead() || (active() && spaceData(s).get('memberEdit', false) == true); }
+
+    match /spaces/{spaceId} {
+      allow read: if active();
+      allow create, delete: if admin();
+      allow update: if lead()
+        || (active() && existing().get('memberEdit', false) == true && onlyChanged(['tree', 'updatedAt']));
+    }
+
+    match /pages/{pageId} {
+      allow read: if active();
+      allow create: if canEditSpace(incoming().spaceId)
+        && str(incoming().title, 1, 200)
+        && incoming().createdBy == uid() && incoming().updatedBy == uid()
+        && incoming().updatedByName == me().name
+        && incoming().rev == 1;
+      allow update: if canEditSpace(existing().spaceId)
+        && incoming().spaceId == existing().spaceId
+        && incoming().createdBy == existing().createdBy
+        && str(incoming().title, 1, 200)
+        && incoming().updatedBy == uid() && incoming().updatedByName == me().name
+        && incoming().rev == existing().rev + 1;
+      allow delete: if lead() || (canEditSpace(existing().spaceId) && existing().createdBy == uid());
+    }
+
+    function validTask(d) {
+      return str(d.title, 1, 200) && optStr(d, 'description', 4000)
+        && d.status in ['todo', 'doing', 'blocked', 'done']
+        && d.assignees is list && d.assignees.size() <= 12
+        && d.priority in ['low', 'normal', 'high']
+        && (d.due == null || str(d.due, 10, 10));
+    }
+
+    match /tasks/{taskId} {
+      allow read: if active();
+      allow create: if canEditSpace(incoming().spaceId) && incoming().createdBy == uid() && validTask(incoming());
+      allow update: if active() && incoming().spaceId == existing().spaceId
+        && incoming().createdBy == existing().createdBy
+        && validTask(incoming())
+        && (canEditSpace(existing().spaceId)
+            || (uid() in existing().assignees && onlyChanged(['status', 'order', 'updatedAt', 'completedAt'])));
+      allow delete: if lead() || (canEditSpace(existing().spaceId) && existing().createdBy == uid());
+    }
+
+    // ───────────── audit log ─────────────
+    match /audit/{id} {
+      allow read: if admin();
+      allow create: if lead() && incoming().actorUid == uid() && incoming().actorName == me().name
+        && incoming().at == request.time
+        && str(incoming().summary, 1, 500);
+    }
+  }
+}

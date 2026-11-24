@@ -1,0 +1,15 @@
+{
+  "name": "er-portal-firebase",
+  "private": true,
+  "type": "module",
+  "description": "Firestore security rules for the Engineering Renaissance member portal, plus their tests.",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-er-portal \"node --test rules.test.mjs\"",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
+    "firebase": "13.4.0",
+    "firebase-tools": "15.37.0"
+  }
+}
