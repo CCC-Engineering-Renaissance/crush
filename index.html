@@ -215,6 +215,10 @@ p{text-wrap:pretty}
 .pool .motion-btn{right:var(--pad);bottom:40px;border-color:rgba(255,255,255,.5);background:rgba(17,40,90,.35);color:#fff}
 .pool-band{padding:120px 0}
 .pool-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:56px;align-items:center}
+.pool-title{display:flex;align-items:center;justify-content:space-between;gap:24px}
+.pool-title .h2{flex:1 1 auto}
+.pool-logo{flex:none;width:auto;height:clamp(96px,10vw,136px);filter:drop-shadow(0 8px 18px rgba(9,30,66,.35))}
+@media (max-width:560px){.pool-title{flex-direction:column-reverse;align-items:flex-start;gap:18px}.pool-logo{height:88px}}
 .awards-card{background:#fff;color:var(--ink);border-radius:18px;padding:28px 30px;box-shadow:0 24px 60px rgba(9,30,66,.32),0 2px 6px rgba(9,30,66,.18)}
 .awards-card h3{font-size:15px;font-weight:600;color:var(--muted)}
 .awards-card ol{list-style:none;margin-top:8px}
@@ -483,7 +487,10 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
     <div class="lane top" aria-hidden="true"></div>
     <div class="wrap pool-grid">
       <div>
-        <h2 class="h2">Crush Depth, our MATE ROV team</h2>
+        <div class="pool-title">
+          <h2 class="h2">Crush Depth, our MATE ROV team</h2>
+          <img class="pool-logo" src="crushdepth-logo.png" alt="" width="340" height="469" loading="lazy" decoding="async">
+        </div>
         <p class="lede">Crush Depth designs, builds and pilots underwater robots for the MATE ROV Competition.</p>
         <div class="actions"><a class="btn" href="#crushdepth" data-go="crushdepth">Read about Crush Depth</a></div>
       </div>
