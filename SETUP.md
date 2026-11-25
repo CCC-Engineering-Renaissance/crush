@@ -318,6 +318,11 @@ To turn the bot off, run **stop** in the script editor. Good to know:
   emulator). Run them after any change to `firestore.rules`. GitHub runs them too, along with the
   Discord bot's tests, whenever `firebase/` or `discord-bot/` changes: see the **Actions** tab
   (`.github/workflows/portal-checks.yml`).
+- **Home Screen app:** on phones, `portal/js/views/install.js` offers to add the portal to the Home
+  Screen: a one-tap Install button where the browser allows it (Chrome, Edge and Samsung Internet on
+  Android), and step-by-step instructions on iPhone and iPad, which don't let websites prompt. "Not
+  now" hides it for two weeks; it's always in the menu as **Add to Home Screen**. The app's name,
+  icons and colors are in `portal/manifest.webmanifest`.
 - **Discord bot:** `discord-bot/Code.gs` is the whole bot. `node --test discord-bot/bot.test.mjs`
   runs it against a pretend Discord server and database. After changing it, paste it into the Apps
   Script project again.

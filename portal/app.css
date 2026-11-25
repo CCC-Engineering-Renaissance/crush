@@ -181,7 +181,11 @@ p { text-wrap: pretty; }
   display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 10px; border-radius: 8px;
   color: var(--rail-text); text-decoration: none; font-size: 14px; font-weight: 500;
 }
-.nav a:hover, .tree-row:hover { background: rgba(255, 255, 255, .06); color: #fff; }
+.nav a:hover, .tree-row:hover, .nav .nav-btn:hover { background: rgba(255, 255, 255, .06); color: #fff; }
+.nav .nav-btn {
+  display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 10px; border-radius: 8px; width: 100%;
+  color: var(--rail-text); font: 500 14px var(--font-ui); background: none; border: 0; cursor: pointer; text-align: left;
+}
 .nav a[aria-current='page'], .tree-row[aria-current='page'] { background: rgba(44, 181, 222, .16); color: #fff; }
 .nav a[aria-current='page'] svg { color: var(--sky); }
 .nav svg { width: 18px; height: 18px; flex: none; opacity: .9; }
@@ -902,3 +906,25 @@ article.is-hidden { border-style: dashed; background: var(--panel-2); }
 .at-field { position: relative; display: inline-flex; align-items: center; }
 .at-field > span { position: absolute; left: 12px; color: var(--text-3); pointer-events: none; font-size: 14px; }
 .at-field .input { padding-left: 26px; }
+
+/* ───────── Add to Home Screen ───────── */
+.install-sheet {
+  position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 70;
+  max-width: 440px; margin: 0 auto; padding: 16px 16px 14px; border-radius: 18px;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  box-shadow: 0 18px 50px rgba(10, 14, 26, .28), 0 2px 6px rgba(10, 14, 26, .12);
+  animation: sheet-up .32s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .install-sheet { animation: none; } }
+.install-head { display: flex; gap: 12px; align-items: center; }
+.install-head img { width: 48px; height: 48px; border-radius: 12px; flex: none; }
+.install-head h2 { margin: 0; font-size: 16.5px; line-height: 1.25; letter-spacing: -.01em; }
+.install-head p { margin: 2px 0 0; font-size: 14px; color: var(--text-2); }
+.install-steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; counter-reset: step; }
+.install-steps li { display: flex; gap: 10px; align-items: center; font-size: 14.5px; line-height: 1.35; counter-increment: step; }
+.install-steps li::before { content: counter(step); flex: none; width: 20px; font: 600 13px var(--font-num); color: var(--text-3); text-align: center; }
+.install-icon { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); }
+.install-note { margin: 12px 0 0; font-size: 13px; color: var(--text-3); }
+.install-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+@media (min-width: 901px) { .install-sheet { left: auto; right: 24px; bottom: 24px; } }

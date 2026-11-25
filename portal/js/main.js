@@ -2,5 +2,7 @@
 import { html, render } from '../vendor/preact.js';
 import config from '../config.js';
 import { App } from './views/app.js';
+import { initInstall } from './views/install.js';
 
+initInstall();
 render(html`<${App} config=${config} />`, document.getElementById('app'));

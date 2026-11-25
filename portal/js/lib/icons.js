@@ -53,6 +53,10 @@ const P = {
   hashLock: '<path d="M3 11h9.5M2.5 16.5h9.5M7.6 7 6.2 21M11.8 10.5l-1.1 10.5"/><rect x="14" y="7" width="8.5" height="6.5" rx="1.4"/><path d="M15.9 7V5.3a2.35 2.35 0 0 1 4.7 0V7"/>',
   chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
   eyeOff: '<path d="M3 3l18 18"/><path d="M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 8.5 4.5 9.5 6a17 17 0 0 1-2.8 3.4M6.2 7.6A17 17 0 0 0 2.5 12c1 1.5 4.5 6 9.5 6 1.5 0 2.9-.4 4.1-1"/><path d="M9.9 10a3 3 0 0 0 4.1 4.2"/>',
+  // Add to Home Screen steps: Safari's Share button, the Add to Home Screen item, Chrome's ⋮ menu.
+  share: '<path d="M12 3.5v11"/><path d="m8 7.5 4-4 4 4"/><path d="M8 10.5H6.5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H16"/>',
+  addSquare: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/>',
+  dotsV: '<circle cx="12" cy="5" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="19" r="1.4" fill="currentColor"/>',
   eye: '<path d="M2.5 12C3.5 10.5 7 6 12 6s8.5 4.5 9.5 6c-1 1.5-4.5 6-9.5 6s-8.5-4.5-9.5-6z"/><circle cx="12" cy="12" r="3"/>',
 };
 

@@ -13,6 +13,7 @@ import { Announcements } from './announcements.js';
 import { MyTasks, Board } from './tasks.js';
 import { Members, MemberProfile, EditProfile } from './members.js';
 import { SpacesIndex, SpaceHome, PageView, openNewSpace } from './spaces.js';
+import { canInstall, openInstallSheet } from './install.js';
 import { Admin } from './admin.js';
 
 const ROLE_LABEL = { admin: 'Admin', lead: 'Lead', member: 'Member' };
@@ -155,6 +156,7 @@ function Rail({ route }) {
       </div>
     </div>
     <div class="rail-foot">
+      ${canInstall() && html`<div class="nav"><button type="button" class="nav-btn" onClick=${() => { setState({ railOpen: false }); openInstallSheet(); }}><${Icon} name="addSquare" />Add to Home Screen</button></div>`}
       ${admin && html`<div class="nav" style="margin-bottom:6px"><${NavLink} to="/admin" icon="shield" label="Admin" route=${route} count=${pendingMembers.length} /></div>`}
       <a class="rail-user" href="#/profile"><${Avatar} person=${profile} size=${32} />
         <span style="min-width:0"><b class="nowrap">${profile.name}</b><small>${profile.title || ROLE_LABEL[profile.role]}</small></span></a>

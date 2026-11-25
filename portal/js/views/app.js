@@ -4,6 +4,7 @@ import { useStore, setState, getState } from '../lib/store.js';
 import { DemoBar, initTheme, SubteamPicker } from './common.js';
 import { BullArt } from './bull-art.js';
 import { Portal } from './shell.js';
+import { InstallSheet } from './install.js';
 
 function demoRequested() {
   try { return sessionStorage.getItem('er-demo') === '1' || new URLSearchParams(location.search).has('demo'); } catch { return false; }
@@ -67,7 +68,7 @@ export function App({ config }) {
   else if (profile.status !== 'active') screen = html`<${NoAccess} />`;
   else screen = html`<${Portal} />`;
 
-  return html`${mode === 'demo' && !(profile && profile.status === 'active') ? html`<${DemoBar} />` : null}${screen}<${ModalHost} /><${Toasts} />`;
+  return html`${mode === 'demo' && !(profile && profile.status === 'active') ? html`<${DemoBar} />` : null}${screen}<${InstallSheet} /><${ModalHost} /><${Toasts} />`;
 }
 
 function Boot() {
