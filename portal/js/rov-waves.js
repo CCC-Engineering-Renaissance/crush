@@ -1,4 +1,4 @@
-// The Crush Depth page's 3D stage background: rings of ASCII water spreading out from the ROV in the middle and
+// The Crush Depth page's 3D stage background: rings of blue ASCII water spreading out from the ROV in the middle and
 // dying away as they go. index.html starts it when the stage comes near the screen.
 //
 //   const waves = startRovWaves(stage)   waves.stop()
@@ -11,10 +11,11 @@
 
 const RAMP = ' .:-~=+*#';
 // Three brightnesses, so each row is three fillText calls rather than one per character
+// in the club's blues: sky (#2CB5DE) for the swell, the deeper water blue (#1779B4) for the crests
 const TIERS = [
-  { from: 1, fill: 'rgba(171,225,224,.30)' },
-  { from: 4, fill: 'rgba(171,225,224,.55)' },
-  { from: 6, fill: 'rgba(236,251,255,.82)' },
+  { from: 1, fill: 'rgba(44,181,222,.32)' },
+  { from: 4, fill: 'rgba(44,181,222,.7)' },
+  { from: 6, fill: 'rgba(23,121,180,.92)' },
 ];
 const TAU = Math.PI * 2;
 const RINGS = 4.2;      // rings per unit of radius (half the stage's short side)

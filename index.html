@@ -299,29 +299,29 @@ p{text-wrap:pretty}
   .demo-grid .d-2{aspect-ratio:4/5}
 }
 
-/* Crush Depth: the 3D ROV, floating in the pool. The poster shows until someone presses "Explore in 3D";
-   then portal/js/rov-viewer.js loads three.js and the model and draws it over the water. Behind both,
-   portal/js/rov-waves.js draws rings of ASCII water spreading out from the ROV. */
-.rov-stage{position:relative;aspect-ratio:16/9;border-radius:20px;box-shadow:0 24px 60px rgba(9,30,66,.28),0 2px 6px rgba(9,30,66,.16)}
-.rov-waves{position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+/* Crush Depth: the 3D ROV, floating on the page. The poster shows while portal/js/rov-viewer.js loads three.js
+   and the model (as the stage comes near the screen); then the live model takes its place. Behind both,
+   portal/js/rov-waves.js draws rings of blue ASCII water spreading out from the ROV, fading out before the edges. */
+.rov-stage{position:relative;isolation:isolate;overflow:hidden;aspect-ratio:16/9;border-radius:20px}
+.rov-waves{position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;-webkit-mask-image:radial-gradient(ellipse at center,#000 42%,transparent 71%);mask-image:radial-gradient(ellipse at center,#000 42%,transparent 71%)}
 .rov-poster{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transition:opacity .6s}
 .rov-stage.live .rov-poster{opacity:0;pointer-events:none}
 .rov-stage [hidden]{display:none}
 .rov-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;outline:none;touch-action:pan-y}
 .rov-canvas:active{cursor:grabbing}
-.rov-canvas:focus-visible{box-shadow:inset 0 0 0 3px var(--sky);border-radius:20px}
+.rov-canvas:focus-visible{box-shadow:inset 0 0 0 3px var(--sky-ink);border-radius:20px}
 .rov-start-wrap{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);display:grid;justify-items:center;gap:8px;text-align:center;z-index:1}
-.rov-note{font-size:13.5px;color:#fff;text-shadow:0 1px 3px rgba(6,26,64,.55)}
-.rov-progress{position:absolute;left:50%;bottom:44px;width:min(320px,60%);height:6px;transform:translateX(-50%);border-radius:999px;background:rgba(255,255,255,.28);overflow:hidden;z-index:1}
-.rov-progress span{display:block;height:100%;width:0;background:#fff;border-radius:inherit;transition:width .2s}
-.rov-hint{position:absolute;left:16px;bottom:16px;max-width:calc(100% - 260px);padding:6px 12px;border-radius:999px;font-size:13.5px;line-height:1.3;color:#fff;background:rgba(17,40,90,.35);pointer-events:none;transition:background .2s;z-index:1}
-.rov-hint[data-flash]{background:rgba(17,40,90,.8)}
+.rov-note{font-size:13.5px;color:var(--muted)}
+.rov-progress{position:absolute;left:50%;bottom:44px;width:min(320px,60%);height:6px;transform:translateX(-50%);border-radius:999px;background:rgba(17,19,24,.08);overflow:hidden;z-index:1}
+.rov-progress span{display:block;height:100%;width:0;background:var(--sky-ink);border-radius:inherit;transition:width .2s}
+.rov-hint{position:absolute;left:16px;bottom:16px;max-width:calc(100% - 260px);padding:6px 12px;border-radius:999px;font-size:13.5px;line-height:1.3;color:var(--text);background:rgba(245,247,250,.92);border:1px solid var(--line);pointer-events:none;transition:background .2s,color .2s;z-index:1}
+.rov-hint[data-flash]{background:var(--ink);border-color:var(--ink);color:#fff}
 .rov-tools{position:absolute;right:14px;bottom:14px;display:flex;gap:8px;z-index:1}
-.rov-tool{min-height:34px;padding:0 13px;border-radius:999px;border:1px solid rgba(255,255,255,.55);background:rgba(17,40,90,.45);color:#fff;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
-.rov-tool:hover{background:rgba(17,40,90,.7)}
-.rov-tool:focus-visible{outline:3px solid #fff;outline-offset:2px}
-.rov-error{position:absolute;left:50%;top:20px;transform:translateX(-50%);max-width:calc(100% - 32px);padding:8px 14px;border-radius:10px;background:#fff;color:var(--ink);font-size:14.5px;z-index:2}
-.rov-stage:fullscreen{border-radius:0;aspect-ratio:auto}
+.rov-tool{min-height:34px;padding:0 13px;border-radius:999px;border:1px solid var(--line-2);background:#fff;color:var(--ink);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+.rov-tool:hover{background:var(--bg-2)}
+.rov-tool:focus-visible{outline:3px solid var(--sky-ink);outline-offset:2px}
+.rov-error{position:absolute;left:50%;top:20px;transform:translateX(-50%);max-width:calc(100% - 32px);padding:8px 14px;border-radius:10px;border:1px solid var(--line-2);background:#fff;color:var(--ink);font-size:14.5px;box-shadow:0 6px 18px rgba(17,19,24,.08);z-index:2}
+.rov-stage:fullscreen{border-radius:0;aspect-ratio:auto;background:var(--bg)}
 .rov-stage:fullscreen .rov-canvas{touch-action:none}
 @media (max-width:800px){.rov-stage{aspect-ratio:4/5;border-radius:16px}.rov-hint{max-width:calc(100% - 28px);bottom:62px}.rov-canvas:focus-visible{border-radius:16px}}
 
@@ -865,7 +865,7 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
   <section class="section">
     <div class="wrap">
       <div class="section-head"><h2 class="h2">Explore the ROV</h2><p class="lede">Our latest vehicle, straight from the CAD model. Turn it around and zoom in to see how it's built.</p></div>
-      <div class="rov-stage pool" data-src="rov.glb" data-rotate="0,0,0">
+      <div class="rov-stage" data-src="rov.glb" data-rotate="0,0,0">
         <img class="rov-poster" src="rov-poster.webp" alt="The Crush Depth ROV, rendered from its CAD model" width="1600" height="900" loading="lazy" decoding="async">
         <div class="rov-start-wrap">
           <button class="btn rov-start" type="button">Explore in 3D</button>
@@ -1243,7 +1243,8 @@ function setMotionPaused(paused){
   window.syncSectionVideos=sync;
 })();
 document.addEventListener('click',e=>{const b=e.target.closest('.motion-btn');if(b)setMotionPaused(b.getAttribute('aria-pressed')!=='true')});
-// ── Crush Depth page: the 3D ROV. Nothing heavy loads until someone presses "Explore in 3D". ──
+// ── Crush Depth page: the 3D ROV. three.js and the model load as the stage comes near the screen, so it's ready to
+//    turn by the time someone touches it. Visitors saving data get an "Explore in 3D" button instead. ──
 (function(){
   const stage=document.querySelector('.rov-stage');if(!stage)return;
   const $=s=>stage.querySelector(s);
@@ -1260,8 +1261,10 @@ document.addEventListener('click',e=>{const b=e.target.closest('.motion-btn');if
     },{rootMargin:'200px'});
     near.observe(stage);
   }
-  let viewer=null;
-  start.addEventListener('click',async()=>{
+  let viewer=null,loading=false;
+  async function load(focus){
+    if(viewer||loading)return;
+    loading=true;
     err.hidden=true;wrap.hidden=true;bar.hidden=false;
     const fill=bar.querySelector('span');
     const progress=f=>{const p=Math.round(f*100);fill.style.width=p+'%';bar.setAttribute('aria-valuenow',p)};
@@ -1270,13 +1273,24 @@ document.addEventListener('click',e=>{const b=e.target.closest('.motion-btn');if
       if(!mod.webglAvailable())throw new Error('webgl');
       viewer=await mod.mountRovViewer(stage,{src:stage.dataset.src,rotate:(stage.dataset.rotate||'0,0,0').split(',').map(Number),onProgress:progress});
       stage.classList.add('live');bar.hidden=true;hint.hidden=false;tools.hidden=false;
-      viewer.canvas.focus({preventScroll:true});
+      if(focus)viewer.canvas.focus({preventScroll:true});
     }catch(e){
-      bar.hidden=true;wrap.hidden=false;
-      err.textContent=e&&e.message==='webgl'?"This browser can't show 3D models.":"Couldn't load the 3D model. Check your connection and try again.";
+      const webgl=e&&e.message==='webgl';
+      bar.hidden=true;wrap.hidden=webgl;start.textContent='Try again';
+      err.textContent=webgl?"This browser can't show 3D models.":"Couldn't load the 3D model. Check your connection and try again.";
       err.hidden=false;
     }
-  });
+    loading=false;
+  }
+  start.addEventListener('click',()=>load(true));
+  // A touch on the picture before it's ready starts the download straight away
+  stage.addEventListener('pointerdown',e=>{if(!e.target.closest('button'))load(false)});
+  const net=navigator.connection||{};
+  if(window.IntersectionObserver&&!net.saveData&&!/2g$/.test(net.effectiveType||'')){
+    wrap.hidden=true;
+    const soon=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){soon.disconnect();load(false)}},{rootMargin:'900px 0px'});
+    soon.observe(stage);
+  }
   tools.addEventListener('click',e=>{
     const b=e.target.closest('[data-act]');if(!b||!viewer)return;
     if(b.dataset.act==='reset')viewer.reset();
