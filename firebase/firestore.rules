@@ -295,13 +295,24 @@ service cloud.firestore {
         && (d.due == null || str(d.due, 10, 10));
     }
 
+    // A space's icon: an emoji, or a small picture the portal shrank and kept in the document
+    // itself as a PNG, JPEG or WebP data: URL (so no file storage is needed, and no outside links).
+    function validSpaceIcon(d) {
+      return optStr(d, 'icon', 64)
+        && (!('iconImage' in d) || d.iconImage == null
+            || (d.iconImage is string && d.iconImage.size() <= 50000
+                && d.iconImage.matches('data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}')));
+    }
+
     match /spaces/{spaceId} {
       allow read: if active();
-      allow create, delete: if admin();
-      // Leads rename and describe spaces they can open. Only admins change who can open them.
-      allow update: if admin()
+      allow create: if admin() && validSpaceIcon(incoming());
+      allow delete: if admin();
+      // Leads rename, describe and change the icon of spaces they can open. Only admins change who
+      // can open them.
+      allow update: if validSpaceIcon(incoming()) && (admin()
         || (lead() && canSeeSpace(spaceId)
-            && onlyChanged(['name', 'icon', 'color', 'description', 'memberEdit', 'updatedAt']));
+            && onlyChanged(['name', 'icon', 'iconImage', 'color', 'description', 'memberEdit', 'updatedAt'])));
 
       match /tasks/{taskId} {
         allow read: if canSeeSpace(spaceId);

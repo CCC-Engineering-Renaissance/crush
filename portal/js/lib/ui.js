@@ -74,10 +74,19 @@ function ModalFrame({ item }) {
     const el = ref.current;
     const first = el?.querySelector('[autofocus], input:not([type=hidden]), select, textarea, button.btn-primary');
     (first || el)?.focus?.();
-    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); item.close(); } };
+    // When one dialog opens over another, Escape closes only the top one.
+    const onKey = (e) => {
+      const list = modals.get();
+      if (e.key !== 'Escape' || e.defaultPrevented || list[list.length - 1]?.id !== item.id) return;
+      e.preventDefault(); e.stopPropagation(); item.close();
+    };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; prev?.focus?.(); };
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (!modals.get().length) document.body.style.overflow = '';
+      prev?.focus?.();
+    };
   }, []);
   return html`<div class="modal-wrap" onMouseDown=${(e) => { if (e.target === e.currentTarget) item.close(); }}>
     <div ref=${ref} tabindex="-1">${item.render(item.close)}</div>
@@ -241,8 +250,14 @@ export function useLive(subscribe, deps = []) {
   return st;
 }
 
-export const EMOJIS = ['📄', '📌', '📋', '🗂️', '📎', '📝', '✅', '🧭', '🛠️', '⚙️', '🔩', '⚡', '🔌', '💻', '🤖', '🌊', '🐂', '🏊', '🧪', '🔬',
-  '📐', '📏', '🧰', '🔋', '📷', '🎬', '🎨', '📣', '💼', '💰', '🤝', '🏆', '🗓️', '🎓', '🧠', '🚀', '🛟', '⚠️', '❤️', '⭐'];
+// Eight to a row: notes, tools, electronics, science and bodies, the water, media and business, the rest.
+export const EMOJIS = ['📄', '📌', '📋', '🗂️', '📎', '📝', '✅', '🗓️',
+  '🛠️', '🔧', '🔨', '🔩', '⚙️', '🧰', '📐', '📏',
+  '⚡', '🔌', '🔋', '💡', '💻', '🕹️', '🤖', '📡',
+  '🧪', '🔬', '🧲', '🧠', '🦾', '🦿', '✋', '🛰️',
+  '🌊', '🏊', '🎈', '⚓', '🐙', '🦈', '🐂', '🚀',
+  '📷', '🎬', '🎨', '📣', '💼', '💰', '📈', '🤝',
+  '🏆', '🎓', '🎯', '🧭', '⚠️', '❤️', '⭐', '📦'];
 
 export function EmojiPicker({ onPick, onClose }) {
   return html`<${Modal} title="Choose an icon" onClose=${onClose}

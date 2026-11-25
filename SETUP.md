@@ -123,6 +123,10 @@ Nobody can get admin rights from the website itself, so the first admin is set i
    you add. Add people from the space (**Who can open it**, which can add a whole subteam at once) or
    from the person (**Admin → Members → Manage → Private spaces they can open**). When you approve
    someone, the private spaces tied to the subteams they picked are already ticked.
+7. **Space icons.** Each starter space comes with an emoji. Leads change one by clicking the big icon
+   at the top of the space (or in its settings): pick an emoji, type any emoji, upload a picture, or
+   go back to a plain #. Pictures are cropped to a small square and saved in the space itself, so
+   you don't need Firebase Storage. Logos and simple pictures read best at sidebar size.
 
 The public site's **Get Involved** buttons and the **Member portal** link in the menu now lead here.
 
@@ -329,7 +333,9 @@ To turn the bot off, run **stop** in the script editor. Good to know:
 - **Spaces:** `spaces/{id}` holds a space's name, subsidiary and whether it's private; its page list
   and Drive folder are in `spaceContent/{id}` and its tasks in `spaces/{id}/tasks`, so the rules can
   check access by the space id in the path. `users/{uid}.spaces` lists the private spaces someone can
-  open.
+  open. A space's icon is `icon` (an emoji) or `iconImage`, a picture of at most 128 px that
+  `portal/js/lib/picture.js` makes in the browser and stores as a data: URL. The rules accept only
+  PNG, JPEG or WebP data URLs up to 50,000 characters, so an icon can't be a link to another site.
 - **Deploying rules from the command line** instead of pasting them: copy
   `firebase/.firebaserc.example` to `firebase/.firebaserc`, set your project ID, then
   `npx firebase login` and `npm run deploy:rules`.

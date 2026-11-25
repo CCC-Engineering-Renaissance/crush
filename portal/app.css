@@ -209,8 +209,10 @@ p { text-wrap: pretty; }
 /* Spaces read like chat channels: a hash per space, grouped under each subsidiary. */
 .space-row { gap: 8px; padding-right: 6px; }
 .space-row .space-link { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; color: inherit; text-decoration: none; }
-.space-row .space-link svg { width: 18px; height: 18px; flex: none; color: var(--rail-dim); }
-.space-row:hover .space-link svg, .space-row[aria-current='page'] .space-link svg { color: var(--rail-text); }
+.space-row .space-link > svg { width: 18px; height: 18px; flex: none; color: var(--rail-dim); }
+.space-row:hover .space-link > svg, .space-row[aria-current='page'] .space-link > svg { color: var(--rail-text); }
+.space-row .row-lock { display: inline-grid; flex: none; margin-left: -3px; color: var(--rail-dim); }
+.space-row .row-lock svg { width: 12px; height: 12px; }
 .space-row .twist { margin-left: auto; opacity: 0; }
 .space-row:hover .twist, .space-row .twist:focus-visible, .space-row .twist[aria-expanded='true'] { opacity: 1; }
 @media (hover: none) { .space-row .twist { opacity: 1; } }
@@ -892,6 +894,21 @@ p { text-wrap: pretty; }
 /* ───────── Subsidiaries, private spaces, Discord posts ───────── */
 .space-glyph { width: 36px; display: grid; place-items: center; color: var(--text-3); flex: none; }
 .space-glyph.lg { width: 44px; height: 44px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); color: var(--text-2); }
+/* A space's own icon in place of the #: an emoji, or a small picture someone uploaded. */
+.space-ico { display: inline-grid; place-items: center; flex: none; line-height: 1; }
+.space-ico.is-emoji { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
+.space-ico img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 24%; }
+.glyph-btn { padding: 0; cursor: pointer; font: inherit; transition: background .15s, border-color .15s; }
+.glyph-btn:hover { background: var(--hover); border-color: var(--line-2); }
+.name-row { display: flex; gap: 8px; }
+.icon-pick { width: 42px; flex: none; display: grid; place-items: center; padding: 0; border: 1px solid var(--line-2); border-radius: var(--r-ctl); background: var(--panel-2); color: var(--text-2); cursor: pointer; }
+.icon-pick:hover { background: var(--hover); }
+.mini-head { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.emoji-grid button[aria-pressed='true'] { background: var(--hover); box-shadow: inset 0 0 0 2px var(--primary); }
+.icon-preview { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
+.icon-preview-big { width: 96px; height: 96px; flex: none; border-radius: 22px; border: 1px solid var(--line); background: var(--panel-2); object-fit: cover; }
+.icon-preview-rail { display: flex; align-items: center; gap: 8px; min-width: 170px; max-width: 240px; padding: 8px 12px; border-radius: 10px; background: var(--rail); color: var(--rail-text); font-size: 13.5px; }
+.icon-preview-rail .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip svg { flex: none; }
 .chip-toggle[aria-pressed='true'] svg { color: currentColor; }
 .pick-groups { display: grid; gap: 12px; }

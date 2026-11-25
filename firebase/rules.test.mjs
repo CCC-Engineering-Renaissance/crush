@@ -242,6 +242,19 @@ test('leads rename spaces they can open; only admins change who can open them', 
   await assertSucceeds(getDoc(doc(as('other'), 'spaceContent/leads')));
 });
 
+test('space icons: leads set an emoji or a small picture, never a link or anything big', async () => {
+  const png = 'data:image/png;base64,' + 'iVBORw0KGgo'.padEnd(800, 'A') + '==';
+  await assertSucceeds(updateDoc(doc(as('lead'), 'spaces/open'), { icon: '🦾', iconImage: null }));
+  await assertSucceeds(updateDoc(doc(as('lead'), 'spaces/open'), { icon: '', iconImage: png }));
+  await assertFails(updateDoc(doc(as('lead'), 'spaces/open'), { iconImage: 'https://example.com/tracker.png' }));
+  await assertFails(updateDoc(doc(as('lead'), 'spaces/open'), { iconImage: 'data:image/svg+xml;base64,PHN2Zz4=' }));
+  await assertFails(updateDoc(doc(as('admin'), 'spaces/open'), { iconImage: 'data:image/png;base64,' + 'A'.repeat(60000) }));
+  await assertFails(updateDoc(doc(as('lead'), 'spaces/open'), { icon: 'x'.repeat(70) }));
+  await assertFails(updateDoc(doc(as('mem'), 'spaces/open'), { icon: '🐙' }));
+  await assertFails(updateDoc(doc(as('lead'), 'spaces/leads'), { icon: '🐙' }));   // not let in
+  await assertSucceeds(setDoc(doc(as('admin'), 'spaces/new'), { name: 'new', icon: '🛟', iconImage: png, memberEdit: true }));
+});
+
 test('outlines: editors change the page list, leads also link the Drive folder', async () => {
   const tree = [{ id: 'x', title: 'New', icon: '📄', parentId: null, order: 1 }];
   await assertSucceeds(updateDoc(doc(as('other'), 'spaceContent/open'), { tree }));

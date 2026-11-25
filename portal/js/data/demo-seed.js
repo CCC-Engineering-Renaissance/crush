@@ -25,6 +25,12 @@ export const PERSONAS = [
 ];
 export const VISITOR = { uid: 'u-visitor', email: 'taylor.morgan@example.com', name: 'Taylor Morgan', photoURL: null };
 
+// Each sample space's emoji. Leads can pick another, upload a picture, or go back to #.
+export const SPACE_ICONS = {
+  'club-hq': '🐂', 'cd-mgmt': '💼', 'cd-leads': '🧭', 'cd-marketing': '📣', 'cd-float': '🎈', 'cd-housing': '📦', 'cd-manips': '🦾',
+  'cd-chassis': '🔩', 'cd-electrical': '⚡', 'cd-controls': '🕹️', 'pr-electrical': '🔌', 'pr-mechanical': '⚙️', 'pr-signal': '🧠',
+};
+
 export function buildSeed() {
   const now = new Date();
   const today = startOfDay(now);
@@ -188,6 +194,7 @@ export function buildSeed() {
     'pr-mechanical': sp('mechanical', 'prosthetic', 'pr-mechanical', 2, 'Finger linkages, the palm and the socket.'),
     'pr-signal': sp('signal-processing', 'prosthetic', 'pr-signal', 3, 'Filtering EEG signals and turning them into grip commands.'),
   };
+  Object.entries(SPACE_ICONS).forEach(([id, icon]) => { spaces[id].icon = icon; });
   const folders = { 'cd-leads': { id: 'demo-crush-folder', name: 'Crush Depth 2027', url: '' } };
   const pages = {};
   const mk = (id, spaceId, parentId, title, icon, blocks, by = 'u-alex', daysAgo = 3) => {

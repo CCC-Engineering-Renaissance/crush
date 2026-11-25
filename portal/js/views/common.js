@@ -1,6 +1,7 @@
 // Pieces shared across screens: depth-contour artwork, the demo bar, theme handling.
 import { html, useState, useEffect, Icon } from '../lib/ui.js';
 import { useStore, setState, groupBySubsidiary } from '../lib/store.js';
+import { isIconImage } from '../lib/picture.js';
 
 // Bathymetric contour lines, like a chart of the sea floor around a seamount.
 function ringPath(cx, cy, r, k) {
@@ -102,7 +103,12 @@ export function SubteamPicker({ value = [], onChange, subteams, subsidiaries, ev
   </div>`;
 }
 
-// The space icon: a hash like a chat channel, with a lock when only chosen people can open it.
+// A space's icon: a picture someone uploaded, an emoji, or a hash like a chat channel (with a lock
+// when only chosen people can open it). Leads choose it in the space's settings.
 export function SpaceIcon({ space, size = 18 }) {
+  const box = { width: size + 'px', height: size + 'px' };
+  if (isIconImage(space?.iconImage)) return html`<span class="space-ico" style=${box}><img src=${space.iconImage} alt="" width=${size} height=${size} /></span>`;
+  if (space?.icon) return html`<span class="space-ico is-emoji" aria-hidden="true" style=${{ ...box, fontSize: Math.round(size * 0.84) + 'px' }}>${space.icon}</span>`;
   return html`<${Icon} name=${space?.private ? 'hashLock' : 'hash'} size=${size} />`;
 }
+export const hasOwnIcon = (space) => !!(space && (isIconImage(space.iconImage) || space.icon));

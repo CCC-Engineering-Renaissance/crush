@@ -36,21 +36,22 @@ export function Admin({ tab }) {
 // archived: false brings back a starter subteam or activity that was archived before.
 const sub = (name, subsidiaryId, color, order) => ({ name, subsidiaryId, color, order, discordRole: '', archived: false });
 const act = (name, subteamId, order) => ({ name, subteamId, order, archived: false });
+// Each starter space has an emoji; leads can pick another, upload a picture, or go back to #.
 const space = (name, subsidiaryId, subteamId, order, description, extra = {}) => ({ name, subsidiaryId, subteamId, order, description, memberEdit: true, private: false, ...extra });
 const STARTER_SPACES = {
-  'club-hq': space('club-hq', null, null, 1, 'How the club runs: onboarding, lab safety and meeting notes.', { memberEdit: false }),
-  'cd-mgmt': space('mate-club-mgmt', 'crush', null, 1, 'Running the MATE team: budget, sponsors, travel and registration.', { private: true }),
-  'cd-leads': space('tech-leads', 'crush', null, 2, 'Subteam leads: design reviews, priorities and the season plan.', { private: true }),
-  'cd-marketing': space('mate-marketing', 'crush', 'cd-marketing', 3, 'Social posts, the marketing display and sponsor thank-yous.'),
-  'cd-float': space('float', 'crush', 'cd-float', 4, 'Buoyancy, foam and trim.'),
-  'cd-housing': space('housing', 'crush', 'cd-housing', 5, 'The electronics enclosure, seals and pressure tests.'),
-  'cd-manips': space('manips', 'crush', 'cd-manips', 6, 'Manipulators and grippers.'),
-  'cd-chassis': space('chassis', 'crush', 'cd-chassis', 7, 'The frame, mounts and machining.'),
-  'cd-electrical': space('electrical', 'crush', 'cd-electrical', 8, 'Power, the tether and wiring.'),
-  'cd-controls': space('controls-systems', 'crush', 'cd-controls', 9, 'Control code, the control station and sensors.'),
-  'pr-electrical': space('electrical', 'prosthetic', 'pr-electrical', 1, 'The EEG headset, amplifier board and motor drivers.'),
-  'pr-mechanical': space('mechanical', 'prosthetic', 'pr-mechanical', 2, 'Finger linkages, the palm and the socket.'),
-  'pr-signal': space('signal-processing', 'prosthetic', 'pr-signal', 3, 'Filtering EEG signals and turning them into grip commands.'),
+  'club-hq': space('club-hq', null, null, 1, 'How the club runs: onboarding, lab safety and meeting notes.', { memberEdit: false, icon: '🐂' }),
+  'cd-mgmt': space('mate-club-mgmt', 'crush', null, 1, 'Running the MATE team: budget, sponsors, travel and registration.', { private: true, icon: '💼' }),
+  'cd-leads': space('tech-leads', 'crush', null, 2, 'Subteam leads: design reviews, priorities and the season plan.', { private: true, icon: '🧭' }),
+  'cd-marketing': space('mate-marketing', 'crush', 'cd-marketing', 3, 'Social posts, the marketing display and sponsor thank-yous.', { icon: '📣' }),
+  'cd-float': space('float', 'crush', 'cd-float', 4, 'Buoyancy, foam and trim.', { icon: '🎈' }),
+  'cd-housing': space('housing', 'crush', 'cd-housing', 5, 'The electronics enclosure, seals and pressure tests.', { icon: '📦' }),
+  'cd-manips': space('manips', 'crush', 'cd-manips', 6, 'Manipulators and grippers.', { icon: '🦾' }),
+  'cd-chassis': space('chassis', 'crush', 'cd-chassis', 7, 'The frame, mounts and machining.', { icon: '🔩' }),
+  'cd-electrical': space('electrical', 'crush', 'cd-electrical', 8, 'Power, the tether and wiring.', { icon: '⚡' }),
+  'cd-controls': space('controls-systems', 'crush', 'cd-controls', 9, 'Control code, the control station and sensors.', { icon: '🕹️' }),
+  'pr-electrical': space('electrical', 'prosthetic', 'pr-electrical', 1, 'The EEG headset, amplifier board and motor drivers.', { icon: '🔌' }),
+  'pr-mechanical': space('mechanical', 'prosthetic', 'pr-mechanical', 2, 'Finger linkages, the palm and the socket.', { icon: '⚙️' }),
+  'pr-signal': space('signal-processing', 'prosthetic', 'pr-signal', 3, 'Filtering EEG signals and turning them into grip commands.', { icon: '🧠' }),
 };
 export const STARTER = {
   subsidiaries: {

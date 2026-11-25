@@ -1,6 +1,6 @@
 // Demo backend: the same API as firebase-backend.js, backed by sample data kept in this
 // browser only (localStorage). Used before Firebase is set up, and for trying things safely.
-import { buildSeed, PERSONAS, VISITOR } from './demo-seed.js';
+import { buildSeed, PERSONAS, VISITOR, SPACE_ICONS } from './demo-seed.js';
 import { descendants } from './tree.js';
 
 // Bumped whenever the sample data changes shape, so every browser starts over with the new set.
@@ -16,9 +16,18 @@ const uid = (p) => p + '-' + Math.random().toString(36).slice(2, 10);
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw, (k, v) => (typeof v === 'string' && ISO.test(v) ? new Date(v) : v));
+    if (raw) return addIcons(JSON.parse(raw, (k, v) => (typeof v === 'string' && ISO.test(v) ? new Date(v) : v)));
   } catch { /* storage blocked or corrupt: start fresh */ }
   return null;
+}
+
+// Sample data saved before spaces had icons gets them, keeping everything the visitor changed.
+function addIcons(db) {
+  Object.entries(SPACE_ICONS).forEach(([id, icon]) => {
+    const s = db.spaces?.[id];
+    if (s && !('icon' in s) && !('iconImage' in s)) s.icon = icon;
+  });
+  return db;
 }
 
 export function createDemoBackend() {

@@ -4,7 +4,7 @@ import { useStore, setState, getState, isLead, isAdmin, DEFAULT_SETTINGS, visibl
 import { useRoute, href, go } from '../lib/router.js';
 import { clockParts } from '../lib/time.js';
 import { nest } from '../data/tree.js';
-import { DemoBar, setBrowserColor, SpaceIcon } from './common.js';
+import { DemoBar, setBrowserColor, SpaceIcon, hasOwnIcon } from './common.js';
 import { Home } from './home.js';
 import { TimeView } from './time.js';
 import { Reports } from './reports.js';
@@ -189,7 +189,7 @@ function SpaceRow({ sp, route, open, toggle }) {
   return html`<div>
     <div class="tree-row space-row" aria-current=${activeSpace === sp.id && route.parts.length === 2 ? 'page' : undefined}>
       <a href=${href('/s/' + sp.id)} class="space-link"><${SpaceIcon} space=${sp} />
-        <span class="name">${sp.name}</span>${sp.private && html`<span class="sr-only"> (private)</span>`}</a>
+        <span class="name">${sp.name}</span>${sp.private && hasOwnIcon(sp) && html`<span class="row-lock" aria-hidden="true"><${Icon} name="lock" size=${12} /></span>`}${sp.private && html`<span class="sr-only"> (private)</span>`}</a>
       ${tree.length > 0 && html`<button class="twist" aria-expanded=${String(!!isOpen)} aria-label=${(isOpen ? 'Hide pages in ' : 'Show pages in ') + sp.name} onClick=${() => toggle(sp.id, !isOpen)}><${Icon} name="chevronRight" /></button>`}
     </div>
     ${isOpen && tree.length > 0 && html`<${TreeNodes} nodes=${nest(tree)} depth=${1} activePage=${activePage} open=${open} toggle=${toggle} />`}
@@ -270,7 +270,7 @@ function Palette() {
       admin && { label: 'Admin', to: '/admin', icon: 'shield', kind: 'Go to' },
     ].filter(Boolean);
     const sp = spaces.flatMap((s) => [
-      { label: spaceLabel(s), to: '/s/' + s.id, icon: s.private ? 'hashLock' : 'hash', kind: 'Space' },
+      { label: spaceLabel(s), to: '/s/' + s.id, space: s, kind: 'Space' },
       { label: `${spaceLabel(s)} task board`, to: `/s/${s.id}/board`, icon: 'board', kind: 'Board' },
       ...(contents[s.id]?.tree || []).map((n) => ({ label: n.title, to: '/p/' + n.id, icon: 'page', kind: '#' + spaceLabel(s), emoji: n.icon })),
     ]);
@@ -300,7 +300,7 @@ function Palette() {
       <ul id="palette-list" role="listbox">
         ${items.map((it, i) => html`<li key=${it.kind + it.to}><a href=${href(it.to)} role="option" aria-selected=${String(i === sel)}
           onMouseEnter=${() => setSel(i)} onClick=${(e) => { e.preventDefault(); choose(it); }}>
-          ${it.emoji ? html`<span style="width:17px;text-align:center">${it.emoji}</span>` : html`<${Icon} name=${it.icon} />`}<span>${it.label}</span><span class="kind">${it.kind}</span></a></li>`)}
+          ${it.space ? html`<${SpaceIcon} space=${it.space} size=${17} />` : it.emoji ? html`<span style="width:17px;text-align:center">${it.emoji}</span>` : html`<${Icon} name=${it.icon} />`}<span>${it.label}</span><span class="kind">${it.kind}</span></a></li>`)}
         ${!items.length && html`<li class="muted small" style="padding:10px">Nothing matches “${q}”.</li>`}
       </ul>
     </div>

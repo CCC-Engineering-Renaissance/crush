@@ -7,6 +7,7 @@ import { nest, pathTo, descendants } from '../data/tree.js';
 import { BlocksView, EditorHost, DriveBlock, toggleChecklist } from './editor.js';
 import { driveConfigured, pickFromDrive, parseDriveLink } from '../google/drive.js';
 import { useTitle, SpaceIcon } from './common.js';
+import { openIconPicker } from './space-icon.js';
 
 const canEditSpace = (space, profile) => canSeeSpace(space, profile) && (isLead(profile) || !!space?.memberEdit);
 const useTree = (spaceId) => useStore((s) => treeOf(spaceId, s));
@@ -37,7 +38,7 @@ export function SpacesIndex() {
 
 // ───────── One space ─────────
 export function SpaceHome({ spaceId }) {
-  const { profile } = useStore((s) => ({ profile: s.profile }));
+  const { api, profile } = useStore((s) => ({ api: s.api, profile: s.profile }));
   const space = useStore((s) => s.spaces.find((x) => x.id === spaceId));
   const content = useStore((s) => s.contents[spaceId]);
   useTitle(space?.name || 'Space');
@@ -48,10 +49,19 @@ export function SpaceHome({ spaceId }) {
   const tree = nest(treeList);
   const folder = content?.driveFolder;
   const sub = subsidiaryById(space.subsidiaryId);
+  const changeIcon = () => openIconPicker(space, async (look) => {
+    try {
+      await api.saveRef('spaces', { id: space.id, ...look });
+      api.log(profile, 'space.edit', `Changed the icon of #${space.name}`, { type: 'space', id: space.id });
+      toast('Icon changed.');
+    } catch (e) { toastError(e); }
+  });
   return html`<div class="content">
     ${sub && html`<div class="crumbs"><span>${sub.name}</span><${Icon} name="chevronRight" /><span>${space.name}</span></div>`}
     <div class="page-head">
-      <div class="row" style="gap:12px;align-items:center"><span class="space-glyph lg"><${SpaceIcon} space=${space} size=${30} /></span>
+      <div class="row" style="gap:12px;align-items:center">${isLead(profile)
+        ? html`<button type="button" class="space-glyph lg glyph-btn" aria-label="Change the icon" title="Change the icon" onClick=${changeIcon}><${SpaceIcon} space=${space} size=${30} /></button>`
+        : html`<span class="space-glyph lg"><${SpaceIcon} space=${space} size=${30} /></span>`}
         <div><h1>${space.name}</h1>${space.description && html`<p>${space.description}</p>`}</div></div>
       <div class="actions">
         ${editable && html`<button class="btn btn-primary" onClick=${() => openNewPage(space, null)}><${Icon} name="plus" />New page</button>`}
@@ -301,7 +311,9 @@ export function SpaceSettings({ space, preset = {}, close }) {
     name: space?.name || '', description: space?.description || '', memberEdit: space ? !!space.memberEdit : true,
     subsidiaryId: space ? (space.subsidiaryId || '') : (preset.subsidiaryId || ''), subteamId: space?.subteamId || '',
     private: space ? !!space.private : false, driveFolder: content?.driveFolder || null,
+    icon: space?.icon || '', iconImage: space?.iconImage || null,
   });
+  const pickIcon = () => openIconPicker({ ...f, name: f.name.trim() }, (look) => setF((cur) => ({ ...cur, ...look })));
   const [link, setLink] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -317,7 +329,7 @@ export function SpaceSettings({ space, preset = {}, close }) {
     if (!name) return setErr('Name the space.');
     setBusy(true);
     try {
-      const meta = { name, description: f.description.trim(), memberEdit: f.memberEdit };
+      const meta = { name, description: f.description.trim(), memberEdit: f.memberEdit, icon: f.icon, iconImage: f.iconImage };
       const grouping = { subsidiaryId: f.subsidiaryId || null, subteamId: f.subteamId || null, private: f.private };
       let id = space?.id;
       if (isNew) id = await api.createSpace({ ...meta, ...grouping, order: getState().spaces.length + 1 }, { driveFolder: f.driveFolder });
@@ -334,7 +346,12 @@ export function SpaceSettings({ space, preset = {}, close }) {
   return html`<${Modal} title=${isNew ? 'New space' : `#${space.name} settings`} onClose=${close} wide
     footer=${html`<button class="btn" onClick=${close}>Cancel</button><button class="btn btn-primary" onClick=${save} disabled=${busy}>${isNew ? 'Create space' : 'Save'}</button>`}>
     <div class="form-grid">
-      <${Field} label="Name" hint="Short and lowercase reads best, like a Discord channel: chassis, controls-systems."><input class="input" value=${f.name} maxlength="60" placeholder="chassis" onInput=${(e) => setF({ ...f, name: e.target.value })} /></${Field}>
+      <div class="field"><span id="sp-name">Name and icon</span>
+        <div class="name-row">
+          <button type="button" class="icon-pick" aria-label="Change the icon" title="Change the icon" onClick=${pickIcon}><${SpaceIcon} space=${f} size=${22} /></button>
+          <input class="input" aria-labelledby="sp-name" value=${f.name} maxlength="60" placeholder="chassis" onInput=${(e) => setF({ ...f, name: e.target.value })} />
+        </div>
+        <small>Short and lowercase reads best, like a Discord channel: chassis, controls-systems. The icon can be an emoji or a picture.</small></div>
       ${admin ? html`<${Field} label="Subsidiary"><select class="select" value=${f.subsidiaryId} onChange=${(e) => setF({ ...f, subsidiaryId: e.target.value, subteamId: '' })}>
           <option value="">None (club-wide)</option>${subsidiaries.map((x) => html`<option value=${x.id} key=${x.id}>${x.name}</option>`)}</select></${Field}>`
         : html`<div></div>`}
