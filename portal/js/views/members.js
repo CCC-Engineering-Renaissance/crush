@@ -140,7 +140,7 @@ export function EditProfile() {
   const [f, setF] = useState({
     name: profile.name || '', pronouns: profile.pronouns || '', major: profile.major || '', bio: profile.bio || '',
     skills: (profile.skills || []).join(', '), linkedin: profile.links?.linkedin || '', github: profile.links?.github || '', website: profile.links?.website || '',
-    subteams: profile.subteams || [],
+    subteams: profile.subteams || [], discord: profile.discord || '',
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -158,6 +158,7 @@ export function EditProfile() {
       await api.updateMyProfile(profile.uid, {
         name: f.name.trim().slice(0, 80), pronouns: f.pronouns.trim().slice(0, 30), major: f.major.trim().slice(0, 80), bio: f.bio.trim().slice(0, 1000),
         skills: f.skills.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 25).map((s) => s.slice(0, 40)), links, subteams: f.subteams.slice(0, 10),
+        discord: f.discord.trim().replace(/^@/, '').slice(0, 40),
       });
       setState({ membersCache: null });
       toast('Profile saved.');
@@ -177,6 +178,7 @@ export function EditProfile() {
         <${Field} label="About you" full><textarea class="textarea" value=${f.bio} maxlength="1000" onInput=${set('bio')} placeholder="What you work on, what you want to learn"></textarea></${Field}>
         <${Field} label="Skills" full hint="Separate with commas: SolidWorks, Arduino, Python"><input class="input" value=${f.skills} onInput=${set('skills')} /></${Field}>
         <div class="field full"><span>Subteams</span><${SubteamPicker} value=${f.subteams} onChange=${(v) => setF({ ...f, subteams: v })} /></div>
+        <${Field} label="Discord username" full hint="The portal bot DMs you here when someone assigns you a task, or when you’ve been clocked in a long time. Your username, not your display name."><input class="input" value=${f.discord} maxlength="40" placeholder="sofia_r" autocomplete="off" autocapitalize="none" spellcheck="false" onInput=${set('discord')} /></${Field}>
         <${Field} label="LinkedIn"><input class="input" type="url" value=${f.linkedin} placeholder="https://linkedin.com/in/…" onInput=${set('linkedin')} /></${Field}>
         <${Field} label="GitHub"><input class="input" type="url" value=${f.github} placeholder="https://github.com/…" onInput=${set('github')} /></${Field}>
         <${Field} label="Website or portfolio" full><input class="input" type="url" value=${f.website} placeholder="https://…" onInput=${set('website')} /></${Field}>

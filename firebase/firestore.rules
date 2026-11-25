@@ -65,7 +65,7 @@ service cloud.firestore {
     function validProfile(d) {
       return str(d.name, 1, 80)
         && optStr(d, 'pronouns', 30) && optStr(d, 'major', 80) && optStr(d, 'bio', 1000)
-        && optStr(d, 'joinNote', 1000) && optStr(d, 'photoURL', 2000)
+        && optStr(d, 'joinNote', 1000) && optStr(d, 'photoURL', 2000) && optStr(d, 'discord', 40)
         && optList(d, 'skills', 25) && optList(d, 'subteams', 10) && optList(d, 'spaces', 300)
         && (!('tourDone' in d) || d.tourDone is bool)
         && (!('links' in d) || (d.links is map && d.links.keys().hasOnly(['linkedin', 'github', 'website'])
@@ -100,7 +100,7 @@ service cloud.firestore {
       allow update: if
         // Members edit their own profile, never their role or status.
         (userId == uid() && hasProfile()
-          && onlyChanged(['name', 'photoURL', 'pronouns', 'major', 'bio', 'skills', 'links', 'joinNote', 'subteams', 'tourDone'])
+          && onlyChanged(['name', 'photoURL', 'pronouns', 'major', 'bio', 'skills', 'links', 'joinNote', 'subteams', 'tourDone', 'discord'])
           && validProfile(incoming()))
         ||
         // Admins manage role, status, title and everything else.

@@ -168,7 +168,7 @@ In **console.cloud.google.com** (same project):
 Files still follow Drive's own sharing. Keep team files in a shared Drive folder that club members can
 open, or the preview inside a page will ask them to request access.
 
-## 8. Post announcements from Discord (optional)
+## 8. Discord: announcements and DMs (optional)
 
 Leads already announce things in Discord. With the portal bot in the server, a Discord post that
 mentions the bot is copied into the portal's **Announcements** too, so nobody posts twice:
@@ -185,6 +185,15 @@ subteam yet. Only officers can post this way: people whose Discord roles can @ev
 or manage the server.
 
 In the portal, leads can pin a Discord post or hide it from members; edits happen in Discord.
+
+The bot also sends members direct messages, checking every five minutes:
+
+- **New tasks:** when someone assigns them a task in the portal. Assigning yourself sends nothing.
+- **Long clock-ins:** once per session, when they've been clocked in longer than **Admin → Settings →
+  Longest session without approval** (10 hours unless you change it). That's usually a forgotten clock-out.
+
+Members opt in by adding their Discord username under **Profile → Discord username**. The bot skips
+anyone without one, and anyone whose Discord privacy settings block DMs from server members.
 
 The bot is a Google Apps Script that runs under the club Google account every minute. There's no
 server to keep running and it's free.
@@ -237,6 +246,8 @@ Optional script properties:
 | `DISCORD_CHANNELS` | Only watch these channels (names or IDs, separated by commas). |
 | `POSTER_ROLES` | Only these roles (and server admins) can post through the bot. |
 | `DISCORD_GUILD_ID` | Which server to use, if the bot is in more than one. |
+| `PORTAL_URL` | The portal's address for links in DMs. Default: `https://engineeringrenaissance.org/portal/`. |
+| `DIRECT_MESSAGES` | Set to `off` to stop the DMs and keep the announcements. |
 
 To turn the bot off, run **stop** in the script editor. Good to know:
 
@@ -341,6 +352,7 @@ Good to know:
 | Drive picker says "API developer key is invalid" | Add `https://docs.google.com/*` to the picker key's website list (step 7.4). |
 | A Google feature stops loading | Open the browser console. A "Content Security Policy" message names the blocked address; add it to the matching line at the top of `portal/index.html`. |
 | A Discord post that mentions the bot gets no ✅ | Check that the bot can see that channel (step 8a.4) and that the post mentions the bot itself, not just its name in text. The script's **Executions** page at script.google.com shows each run and any error. |
+| A member gets no DMs | Their **Profile → Discord username** must be their username, not their display name, and they must allow DMs from server members (in Discord: the server's name → **Privacy Settings → Direct Messages**). The script's **Executions** page says why each DM was skipped. If **checkSetup** says Discord won't let the bot look members up, turn on **Server Members Intent** (Discord developer portal → your app → **Bot**). |
 | The bot replied that a role isn't linked | Link the role to a subteam (step 8c), then edit the Discord post. It goes up within 10 minutes. |
 | Everything says "Quota exceeded" | Over the free daily limit; it resets at midnight Pacific time. If it happens often, upgrade the Firebase project to the Blaze plan, where the same usage costs cents. |
 

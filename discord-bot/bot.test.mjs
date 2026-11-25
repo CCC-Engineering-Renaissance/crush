@@ -23,7 +23,10 @@ const x = (str) => str.replace(/\b(BOT|OWNER|G|U_LEAD|U_MEM|R_[A-Z]+|C[1-3]|CAT)
 
 let world;
 function newWorld() {
-  const fields = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === null ? { nullValue: null } : typeof v === 'boolean' ? { booleanValue: v } : { stringValue: String(v) }]));
+  const val = (v) => (v === null || v === undefined ? { nullValue: null } : v instanceof Date ? { timestampValue: v.toISOString() }
+    : Array.isArray(v) ? { arrayValue: { values: v.map(val) } } : typeof v === 'boolean' ? { booleanValue: v }
+    : typeof v === 'number' ? { integerValue: String(v) } : { stringValue: String(v) });
+  const fields = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, val(v)]));
   const w = {
     roles: [
       { id: N.G, name: '@everyone', permissions: '0' },
@@ -53,7 +56,19 @@ function newWorld() {
         'old': { name: 'Old', subsidiaryId: null, discordRole: 'Chassis', archived: true },
       },
       subsidiaries: { crush: { name: 'Crush Depth', discordRole: 'MATE' }, prosthetic: { name: 'Prosthetic', discordRole: '' } },
+      // Portal members: Sofia and Priya have their Discord usernames on their profiles, Max doesn't.
+      users: {
+        'u-sofia': { name: 'Sofia', status: 'active', discord: '@Sofia' },
+        'u-priya': { name: 'Priya', status: 'active', discord: 'priya' },
+        'u-max': { name: 'Max', status: 'active' },
+      },
+      presence: {},
+      spaces: {},
     },
+    tasks: [],        // spaces/{spaceId}/tasks/{id}, as { id, spaceId, ...fields }
+    settings: null,   // config/settings
+    dms: [],
+    dmBlocked: [],    // Discord users whose settings block DMs from the server
     announcements: {},
     audit: [],
     reactions: [],
@@ -64,6 +79,7 @@ function newWorld() {
     cache: {},
     triggers: [],
   };
+  w.fields = fields;
   w.fsDocs = (coll) => ({ documents: Object.entries(w.docs[coll]).map(([id, d]) => ({ name: `projects/er-test/databases/(default)/documents/${coll}/${id}`, fields: fields(d) })) });
   return w;
 }
@@ -84,6 +100,11 @@ function handle(url, req) {
     if (path === x('/guilds/G/channels')) {
       return res(200, world.channels.map(({ messages, ...c }) => ({ ...c, last_message_id: messages?.length ? messages[messages.length - 1].id : null })));
     }
+    if (path === x('/guilds/G/members/search')) {
+      const q = u.searchParams.get('query').toLowerCase();
+      return res(200, Object.values(world.members).filter((mb) => [mb.user.username, mb.user.global_name, mb.nick].some((n) => n && n.toLowerCase().startsWith(q))));
+    }
+    if (path === '/users/@me/channels' && method === 'post') return res(200, { id: '8' + JSON.parse(req.payload).recipient_id, type: 1 });
     let m = path.match(new RegExp(`^/guilds/${N.G}/members/(\\d+)$`));
     if (m) return world.members[m[1]] ? res(200, world.members[m[1]]) : res(404, { message: 'Unknown Member' });
     m = path.match(/^\/channels\/(\d+)\/messages$/);
@@ -97,6 +118,12 @@ function handle(url, req) {
       else list = list.slice(-limit);
       return res(200, list.slice().reverse()); // newest first, like Discord
     }
+    if (m && method === 'post' && m[1].startsWith('8')) { // a DM channel: '8' + the user's id
+      const to = m[1].slice(1);
+      if (world.dmBlocked.includes(to)) return res(403, { message: 'Cannot send messages to this user', code: 50007 });
+      world.dms.push({ to, ...JSON.parse(req.payload) });
+      return res(200, { id: snow() });
+    }
     if (m && method === 'post') { world.replies.push({ channel: m[1], ...JSON.parse(req.payload) }); return res(200, { id: snow() }); }
     m = path.match(/^\/channels\/(\d+)\/messages\/(\d+)\/reactions\/([^/]+)\/@me$/);
     if (m && method === 'put') { world.reactions.push({ message: m[2], emoji: decodeURIComponent(m[3]) }); return res(204); }
@@ -107,6 +134,13 @@ function handle(url, req) {
     assert.equal(req.headers.Authorization, 'Bearer oauth-token');
     const path = decodeURIComponent(u.pathname).replace('/v1/projects/er-test/databases/(default)/documents/', '');
     const [coll, id] = path.split('/');
+    if (path.endsWith('documents:runQuery') && method === 'post') {
+      assert.deepEqual(JSON.parse(req.payload).structuredQuery.from, [{ collectionId: 'tasks', allDescendants: true }]);
+      return res(200, [...world.tasks.map(({ id: tid, spaceId, ...t }) => ({ document: { name: `projects/er-test/databases/(default)/documents/spaces/${spaceId}/tasks/${tid}`, fields: world.fields({ spaceId, ...t }) } })), { readTime: new Date().toISOString() }]);
+    }
+    if (coll === 'config' && id === 'settings' && method === 'get') {
+      return world.settings ? res(200, { name: path, fields: world.fields(world.settings) }) : res(404, { error: { status: 'NOT_FOUND' } });
+    }
     if (method === 'get' && world.docs[coll]) return res(200, world.fsDocs(coll));
     if (coll === 'announcements' && method === 'patch') {
       const mask = u.searchParams.getAll('updateMask.fieldPaths');
@@ -133,6 +167,8 @@ function load() {
     PropertiesService: { getScriptProperties: () => ({
       getProperty: (k) => (k in world.props ? world.props[k] : null),
       setProperty: (k, v) => { world.props[k] = String(v); },
+      getProperties: () => ({ ...world.props }),
+      deleteProperty: (k) => { delete world.props[k]; },
     }) },
     CacheService: { getScriptCache: () => ({ get: (k) => world.cache[k] ?? null, put: (k, v) => { world.cache[k] = v; } }) },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
@@ -353,3 +389,86 @@ test('missing settings say exactly what to add', () => {
   delete world.props.FIREBASE_PROJECT_ID;
   assert.throws(() => bot.checkSetup(), /Add FIREBASE_PROJECT_ID/);
 });
+
+// ───────── Direct messages ─────────
+
+const tick = () => { world.props.DM_LAST = '0'; return bot.run_({ recheck: false }); }; // as if five minutes had passed
+
+test('a newly assigned task DMs each assignee once; tasks from before the bot, old ones and self-assigned ones send nothing', () => {
+  const now = Date.now(), day = 86400e3;
+  world.docs.spaces = { s1: { name: 'electrical' } };
+  world.tasks = [{ id: 't0', spaceId: 's1', title: 'From before', status: 'todo', priority: 'normal', assignees: ['u-sofia'], createdBy: 'u-priya', updatedAt: new Date(now) }];
+  bot.setup();
+  tick(); // first run only takes note of who's assigned what
+  assert.equal(world.dms.length, 0);
+
+  world.tasks.push(
+    { id: 't1', spaceId: 's1', title: 'Wire the tether', status: 'todo', priority: 'high', due: '2026-12-05', assignees: ['u-sofia', 'u-priya'], createdBy: 'u-priya', updatedAt: new Date(now) },
+    { id: 't2', spaceId: 's1', title: 'Old news', status: 'todo', priority: 'normal', assignees: ['u-sofia'], createdBy: 'u-priya', updatedAt: new Date(now - 10 * day) },
+  );
+  const log = tick();
+  assert.equal(world.dms.length, 1, 'Sofia only: Priya assigned herself, and t2 is old');
+  assert.equal(world.dms[0].to, N.U_MEM);
+  assert.match(world.dms[0].content, /^You have a new task on the portal: \*\*Wire the tether\*\* \(#electrical, due .+, high priority\)\. Your tasks: https:\/\/engineeringrenaissance\.org\/portal\/#\/tasks$/);
+  assert.deepEqual(world.dms[0].allowed_mentions, { parse: [] });
+  assert.ok(log.some((l) => l.startsWith('DM to Sofia (@sofia) about the task "Wire the tether"')));
+
+  tick();
+  assert.equal(world.dms.length, 1, 'no repeats');
+
+  world.tasks[1].assignees.push('u-max');
+  assert.ok(tick().some((l) => /^No DM to Max about the task "Wire the tether": no Discord username/.test(l)));
+  assert.ok(!tick().some((l) => /Max/.test(l)), 'and that is said once, not every run');
+
+  world.tasks[1].assignees = ['u-priya', 'u-max']; tick();
+  world.tasks[1].assignees = ['u-priya', 'u-max', 'u-sofia']; tick();
+  assert.equal(world.dms.length, 2, 'taken off and put back on: told again');
+
+  world.tasks = world.tasks.filter((t) => t.id !== 't1'); tick();
+  assert.equal(world.props.dmt_t1, undefined, 'a deleted task is forgotten');
+});
+
+test('someone clocked in past the session limit gets one DM per session; blocked DMs are noted once', () => {
+  const now = Date.now(), hour = 3600e3;
+  world.settings = { maxSessionHours: 8 };
+  world.docs.presence = {
+    'u-sofia': { uid: 'u-sofia', entryId: 'e1', start: new Date(now - 9 * hour), name: 'Sofia' },
+    'u-max': { uid: 'u-max', entryId: 'e2', start: new Date(now - 2 * hour), name: 'Max' },
+    'u-priya': { uid: 'u-priya', entryId: 'e3', start: new Date(now - 12 * hour), name: 'Priya' },
+  };
+  world.dmBlocked = [N.U_LEAD];
+  bot.setup();
+  const log = tick();
+  assert.equal(world.dms.length, 1, 'Sofia: Max is under the limit, Priya blocks DMs');
+  assert.equal(world.dms[0].to, N.U_MEM);
+  assert.match(world.dms[0].content, /clocked in to the portal for more than 8 hours, since .+ Sessions this long need a lead’s OK: https:\/\/engineeringrenaissance\.org\/portal\/$/);
+  assert.ok(log.some((l) => /^No DM to Priya about a 12-hour clock-in: their Discord settings block DMs/.test(l)));
+  assert.ok(!tick().some((l) => /Priya/.test(l)));
+  assert.equal(world.dms.length, 1, 'once per session');
+  delete world.docs.presence['u-sofia']; tick();
+  assert.deepEqual(Object.keys(JSON.parse(world.props.DM_LONG)), ['e3'], 'clocked-out sessions are forgotten');
+});
+
+test('DMs: every five minutes at most, the portal’s default limit, usernames as people type them, and an off switch', () => {
+  bot.setup();
+  assert.match(bot.checkSetup(), /DMs: 2 of 3 active members have a Discord username on their portal profile\. .+ more than 10 hours\./);
+  const reads = () => world.calls.filter((c) => c.includes('/documents/presence')).length;
+  bot.run_({ recheck: false });
+  const n = reads();
+  assert.ok(n > 0);
+  bot.run_({ recheck: false });
+  assert.equal(reads(), n, 'not again within five minutes');
+
+  assert.equal(bot.discordHandle_(' @Sofia_R '), 'sofia_r');
+  assert.equal(bot.discordHandle_('oldname#1234'), 'oldname');
+  const cfg = bot.config_(), ctx = { guildId: N.G };
+  assert.equal(bot.discordUserId_(cfg, ctx, 'priya'), N.U_LEAD);
+  assert.equal(bot.discordUserId_(cfg, ctx, 'priya n.'), N.U_LEAD, 'a nickname works when nobody else has it');
+  assert.equal(bot.discordUserId_(cfg, ctx, 'nobody'), null);
+
+  world.props.DIRECT_MESSAGES = 'off';
+  const before = reads(); tick();
+  assert.equal(reads(), before, 'off means off');
+  assert.match(bot.checkSetup(), /DMs are off/);
+});
+

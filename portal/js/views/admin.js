@@ -441,7 +441,7 @@ function SettingsAdmin() {
       <${Field} label="Weekly goal (hours)"><input class="input" type="number" min="0" max="80" value=${f.weeklyGoalHours} onInput=${set('weeklyGoalHours')} /></${Field}>
     </div></section>
     <section class="panel panel-pad"><h2 style="margin:0 0 4px;font-size:16px">Clocking in and out</h2>
-      <p class="small muted" style="margin:0 0 14px">A session longer than this needs a lead’s approval. That catches forgotten clock-outs.</p><div class="form-grid">
+      <p class="small muted" style="margin:0 0 14px">A session longer than this needs a lead’s approval. That catches forgotten clock-outs. If the Discord bot is set up, it also DMs anyone still clocked in past this.</p><div class="form-grid">
       <${Field} label="Longest session without approval (hours)"><input class="input" type="number" min="2" max="16" value=${f.maxSessionHours} onInput=${set('maxSessionHours')} /></${Field}>
     </div>
       <label class="check" style="margin-top:16px"><input type="checkbox" checked=${!!lc.enabled} onChange=${(e) => setLc({ enabled: e.target.checked })} />
