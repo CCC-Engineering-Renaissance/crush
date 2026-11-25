@@ -51,8 +51,12 @@ export function InstallSheet() {
     listeners.add(f);
     const show = () => setOpen(true);
     window.addEventListener('er-install-open', show);
-    // Offer it once people have had a moment to look around.
-    const t = canInstall() && !snoozed() ? setTimeout(show, 2500) : null;
+    // Offer it once people have had a moment to look around, and never over the guided tour.
+    const offer = () => {
+      if (document.documentElement.classList.contains('touring')) window.addEventListener('er-tour-end', () => setTimeout(offer, 1500), { once: true });
+      else show();
+    };
+    const t = canInstall() && !snoozed() ? setTimeout(offer, 2500) : null;
     return () => { listeners.delete(f); window.removeEventListener('er-install-open', show); clearTimeout(t); };
   }, []);
   if (!open || !canInstall()) return null;

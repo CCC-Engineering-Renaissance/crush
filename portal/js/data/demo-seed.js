@@ -168,7 +168,7 @@ export function buildSeed() {
   add(users['u-ethan'], at(addDays(today, -12), 10, 0), at(addDays(today, -12), 21, 0), { more: { status: 'rejected', reviewNote: 'The lab closed at 6. Ask a lead to add the real time.', reviewedBy: 'u-priya', reviewedAt: addDays(today, -11), fix: { reason: 'Forgot to clock out', requestedAt: addDays(today, -11) } } });
   void fixA;
 
-  // People in the lab right now
+  // People working right now
   const presence = {};
   [['u-marcus', 'build', 52], ['u-jordan', 'wiring', 88], ['u-emily', 'media', 23]].forEach(([uid, act, mins]) => {
     const u = users[uid];

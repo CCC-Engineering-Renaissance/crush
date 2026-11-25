@@ -21,6 +21,7 @@ Until step 2 is done, /portal shows a "opens soon" page and a demo with sample d
 | Hours, pages, tasks, events, members | Cloud Firestore (Spark plan) | Free: 50,000 reads and 20,000 writes a day, 1 GiB stored. A club of ~100 uses a small slice of that. No credit card needed. |
 | Files | Your existing Google Drive | Free |
 | Discord announcements bot (optional) | Google Apps Script, under the club Google account | Free |
+| Calendar subscriptions (optional) | Google Apps Script, under the club Google account | Free |
 
 ---
 
@@ -245,6 +246,41 @@ To turn the bot off, run **stop** in the script editor. Good to know:
 - Posts in threads and forum channels aren't picked up. Post in a regular channel.
 - Posts from before you ran setup aren't copied.
 
+## 9. Calendar subscriptions (optional)
+
+Members can subscribe to club events from Google Calendar, Apple Calendar or Outlook, so events land
+in the calendar they already use and update by themselves. Each person gets their own link under
+**Calendar → Subscribe** and picks what's on it: club-wide events plus the subteams they choose (say,
+just Electrical), or everything. A link stops working if its owner turns it off or is no longer an
+active member.
+
+Like the bot, it's a Google Apps Script under the club account, so it's free and there's no server.
+
+1. Open **script.google.com → New project** and name it `ER portal calendar feed`.
+2. Replace everything in **Code.gs** with `calendar-feed/Code.gs`.
+3. **Project Settings → Show "appsscript.json" manifest file in editor**, then replace
+   `appsscript.json` with `calendar-feed/appsscript.json`.
+4. **Project Settings → Script properties → Add script property:** `FIREBASE_PROJECT_ID`, the same
+   Project ID you used for the bot.
+5. Pick **checkSetup** in the function menu and click **Run**. Allow it as the club account, the same way
+   as the bot (**Advanced → Go to ER portal calendar feed (unsafe) → Allow**). The log should say
+   "Firestore OK". If it says the Firestore API isn't turned on, set the script's Google Cloud project
+   to your Firebase project number, as in step 8b.
+6. **Deploy → New deployment → gear icon → Web app.** Leave **Execute as: Me** and set **Who has
+   access: Anyone**, then **Deploy** and copy the **Web app URL** (it ends in `/exec`).
+7. In the portal, open **Admin → Settings → Calendar subscriptions**, paste the address and save.
+   **Subscribe** now shows on the Calendar page for everyone.
+
+Good to know:
+
+- "Anyone" here means anyone with a member's link. Without a valid link the script returns an empty
+  calendar, and it only ever hands out events.
+- After you change `Code.gs`, use **Deploy → Manage deployments → edit (pencil) → Version: New version
+  → Deploy**. That keeps the same address, so nobody has to subscribe again. A brand-new deployment
+  gets a new address, and you'd have to paste it into Settings and everyone would have to resubscribe.
+- Calendar apps decide how often they check. Google Calendar can take up to a day to show a change;
+  Apple Calendar and Outlook are usually quicker. The event's own page in the portal is always current.
+
 ---
 
 ## How the portal keeps things secure
@@ -336,6 +372,13 @@ To turn the bot off, run **stop** in the script editor. Good to know:
   open. A space's icon is `icon` (an emoji) or `iconImage`, a picture of at most 128 px that
   `portal/js/lib/picture.js` makes in the browser and stores as a data: URL. The rules accept only
   PNG, JPEG or WebP data URLs up to 50,000 characters, so an icon can't be a link to another site.
+- **Calendar feed:** `calendar-feed/Code.gs` serves `calendarFeeds/{id}` links (a random 32-character
+  id plus the subteams to show) as iCalendar. It reads Firestore as the club account and caches each
+  feed for 5 minutes. Members create and change only their own links (`firestore.rules`).
+- **Guided tour:** `portal/js/views/tour.js`. Steps point at elements with `data-tour="…"`; a step
+  whose element isn't on screen is skipped. In the live portal it starts on a member's first visit
+  and saves `tourDone` on their profile; in the demo it starts after every sign-in. **Take the tour**
+  in the menu runs it again.
 - **Deploying rules from the command line** instead of pasting them: copy
   `firebase/.firebaserc.example` to `firebase/.firebaserc`, set your project ID, then
   `npx firebase login` and `npm run deploy:rules`.

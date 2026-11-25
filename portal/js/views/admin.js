@@ -408,11 +408,15 @@ function SettingsAdmin() {
     if (!(max >= 2 && max <= 16)) return setErr('Longest session should be between 2 and 16 hours.');
     if (f.termStart && f.termEnd && f.termEnd <= f.termStart) return setErr('The term has to end after it starts.');
     if (lc.enabled && (lc.lat == null || lc.lng == null)) return setErr('Set the lab location before turning on the location check.');
+    const feed = String(f.calendarFeedUrl || '').trim();
+    if (feed && !/^https:\/\/script\.google\.com\/(a\/macros\/[^/]+|macros)\/s\/[\w-]+\/exec$/.test(feed)) {
+      return setErr('The calendar feed address should look like https://script.google.com/macros/s/…/exec. Copy it from Deploy → Manage deployments in the script.');
+    }
     setBusy(true); setErr('');
     try {
       await api.saveSettings({
         clubName: f.clubName.trim(), meetingInfo: f.meetingInfo.trim(), termName: f.termName.trim(), termStart: f.termStart, termEnd: f.termEnd,
-        termGoalHours: Number(f.termGoalHours) || 0, weeklyGoalHours: Number(f.weeklyGoalHours) || 0, maxSessionHours: max,
+        termGoalHours: Number(f.termGoalHours) || 0, weeklyGoalHours: Number(f.weeklyGoalHours) || 0, maxSessionHours: max, calendarFeedUrl: feed,
         locationCheck: { enabled: !!lc.enabled, mode: lc.mode === 'block' ? 'block' : 'flag', lat: lc.lat == null ? null : Number(lc.lat), lng: lc.lng == null ? null : Number(lc.lng), radiusM: Math.max(50, Number(lc.radiusM) || 250) },
         updatedBy: profile.uid,
       });
@@ -451,6 +455,10 @@ function SettingsAdmin() {
           <button class="btn btn-sm" type="button" onClick=${here}><${Icon} name="mapPin" />Use my current location</button></div>
           <small>Easiest: stand in the lab and tap “Use my current location”.</small></div>
       </div>`}
+    </section>
+    <section class="panel panel-pad"><h2 style="margin:0 0 4px;font-size:16px">Calendar subscriptions</h2>
+      <p class="small muted" style="margin:0 0 14px">Members get their own link for Google Calendar, Apple Calendar or Outlook under Calendar → Subscribe, showing club-wide events plus the subteams they pick. Paste the calendar-feed script’s web app address here (SETUP.md step 9). Leave it empty to keep subscriptions off.</p>
+      <div class="form-grid"><${Field} label="Calendar feed address" full><input class="input" type="url" value=${f.calendarFeedUrl || ''} onInput=${set('calendarFeedUrl')} placeholder="https://script.google.com/macros/s/…/exec" /></${Field}></div>
     </section>
     ${err && html`<p class="form-error" role="alert">${err}</p>`}
     <div><button class="btn btn-primary" type="submit" disabled=${busy}>${busy ? 'Saving…' : 'Save settings'}</button></div>

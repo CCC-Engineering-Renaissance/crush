@@ -212,6 +212,16 @@ export function createFirebaseBackend(config) {
       return ids;
     },
     deleteEvent: (id) => deleteDoc(ref('events', id)),
+    // Calendar subscriptions: each member's link is a random id, saved with the subteams it shows.
+    async getMyCalendarFeed(uid) {
+      const s = await getDocs(query(col('calendarFeeds'), where('uid', '==', uid), limit(1)));
+      return s.empty ? null : fromSnap(s.docs[0]);
+    },
+    async saveMyCalendarFeed(uid, { id, subteams, everything }, isNew) {
+      await setDoc(ref('calendarFeeds', id), { uid, subteams, everything, updatedAt: serverTimestamp(), ...(isNew ? { createdAt: serverTimestamp() } : {}) }, { merge: true });
+      return id;
+    },
+    deleteMyCalendarFeed: (id) => deleteDoc(ref('calendarFeeds', id)),
     watchAnnouncements: (cb, onErr) => watch(query(col('announcements'), orderBy('createdAt', 'desc'), limit(40)), cb, onErr),
     async saveAnnouncement(a, me) {
       const { id, ...data } = a;

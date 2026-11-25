@@ -242,6 +242,29 @@ test('leads rename spaces they can open; only admins change who can open them', 
   await assertSucceeds(getDoc(doc(as('other'), 'spaceContent/leads')));
 });
 
+test('calendar links: members make, change and turn off only their own', async () => {
+  const mine = 'A'.repeat(32);
+  const feed = (uid, extra = {}) => ({ uid, subteams: ['electrical'], everything: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...extra });
+  await assertSucceeds(setDoc(doc(as('mem'), `calendarFeeds/${mine}`), feed('mem')));
+  await assertSucceeds(getDoc(doc(as('mem'), `calendarFeeds/${mine}`)));
+  await assertSucceeds(getDocs(query(collection(as('mem'), 'calendarFeeds'), where('uid', '==', 'mem'))));
+  await assertFails(getDoc(doc(as('lead'), `calendarFeeds/${mine}`)));                       // someone else's link
+  await assertSucceeds(updateDoc(doc(as('mem'), `calendarFeeds/${mine}`), { subteams: [], everything: true }));
+  await assertFails(updateDoc(doc(as('lead'), `calendarFeeds/${mine}`), { everything: false }));
+  await assertFails(updateDoc(doc(as('mem'), `calendarFeeds/${mine}`), { uid: 'lead' }));
+  await assertFails(setDoc(doc(as('lead'), `calendarFeeds/${'B'.repeat(32)}`), feed('mem')));  // made for someone else
+  await assertFails(setDoc(doc(as('mem'), 'calendarFeeds/short'), feed('mem')));              // not a random id
+  await assertFails(setDoc(doc(as('mem'), `calendarFeeds/${'C'.repeat(32)}`), feed('mem', { note: 'hi' })));
+  await assertFails(deleteDoc(doc(as('lead'), `calendarFeeds/${mine}`)));
+  await assertSucceeds(deleteDoc(doc(as('mem'), `calendarFeeds/${mine}`)));
+});
+
+test('members remember that they took the tour, as true or false only', async () => {
+  await assertSucceeds(updateDoc(doc(as('mem'), 'users/mem'), { tourDone: true }));
+  await assertFails(updateDoc(doc(as('mem'), 'users/mem'), { tourDone: 'yes' }));
+  await assertFails(updateDoc(doc(as('mem'), 'users/lead'), { tourDone: true }));
+});
+
 test('space icons: leads set an emoji or a small picture, never a link or anything big', async () => {
   const png = 'data:image/png;base64,' + 'iVBORw0KGgo'.padEnd(800, 'A') + '==';
   await assertSucceeds(updateDoc(doc(as('lead'), 'spaces/open'), { icon: '🦾', iconImage: null }));

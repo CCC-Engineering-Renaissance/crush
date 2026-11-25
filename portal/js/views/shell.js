@@ -5,6 +5,7 @@ import { useRoute, href, go } from '../lib/router.js';
 import { clockParts } from '../lib/time.js';
 import { nest } from '../data/tree.js';
 import { DemoBar, setBrowserColor, SpaceIcon, hasOwnIcon } from './common.js';
+import { startTour } from './tour.js';
 import { Home } from './home.js';
 import { TimeView } from './time.js';
 import { Reports } from './reports.js';
@@ -117,9 +118,9 @@ function RailClock() {
     <span><span class="label">Clocked in</span><span class="value">${clockParts(now - new Date(mine.start)).text}</span></span></a>`;
 }
 
-function NavLink({ to, icon, label, route, count }) {
+function NavLink({ to, icon, label, route, count, tour }) {
   const current = to === '/' ? route.path === '/' : route.path === to || route.path.startsWith(to + '/');
-  return html`<a href=${href(to)} aria-current=${current ? 'page' : undefined}><${Icon} name=${icon} />${label}${count ? html`<span class="count" aria-label=${count + ' waiting'}>${count}</span>` : null}</a>`;
+  return html`<a href=${href(to)} data-tour=${tour} aria-current=${current ? 'page' : undefined}><${Icon} name=${icon} />${label}${count ? html`<span class="count" aria-label=${count + ' waiting'}>${count}</span>` : null}</a>`;
 }
 
 function readOpen() { try { return JSON.parse(localStorage.getItem('er-tree-open') || '{}'); } catch { return {}; } }
@@ -138,16 +139,16 @@ function Rail({ route }) {
     <${RailClock} />
     <div class="nav">
       <${NavLink} to="/" icon="home" label="Home" route=${route} />
-      <${NavLink} to="/time" icon="clock" label="My time" route=${route} count=${lead ? pendingFixes.length : 0} />
-      ${lead && html`<${NavLink} to="/reports" icon="chart" label="Reports" route=${route} />`}
-      <${NavLink} to="/calendar" icon="calendar" label="Calendar" route=${route} />
-      <${NavLink} to="/announcements" icon="megaphone" label="Announcements" route=${route} />
-      <${NavLink} to="/tasks" icon="tasks" label="Tasks" route=${route} />
-      <${NavLink} to="/members" icon="users" label="Members" route=${route} />
+      <${NavLink} to="/time" icon="clock" label="My time" route=${route} count=${lead ? pendingFixes.length : 0} tour="nav-time" />
+      ${lead && html`<${NavLink} to="/reports" icon="chart" label="Reports" route=${route} tour="nav-reports" />`}
+      <${NavLink} to="/calendar" icon="calendar" label="Calendar" route=${route} tour="nav-calendar" />
+      <${NavLink} to="/announcements" icon="megaphone" label="Announcements" route=${route} tour="nav-announcements" />
+      <${NavLink} to="/tasks" icon="tasks" label="Tasks" route=${route} tour="nav-tasks" />
+      <${NavLink} to="/members" icon="users" label="Members" route=${route} tour="nav-members" />
     </div>
-    <div class="rail-group">
+    <div class="rail-group" data-tour="spaces">
       <div class="rail-group-head"><a href="#/spaces">Spaces</a>
-        <button onClick=${() => setState({ paletteOpen: true })} aria-label="Search pages"><${Icon} name="search" size=${15} /></button></div>
+        <button data-tour="search" onClick=${() => setState({ paletteOpen: true })} aria-label="Search pages"><${Icon} name="search" size=${15} /></button></div>
       <div class="tree">
         ${groups.map((g) => (g.sub
           ? html`<${SpaceGroup} key=${g.sub.id} sub=${g.sub} items=${g.items} admin=${admin} ...${rowProps} />`
@@ -156,9 +157,10 @@ function Rail({ route }) {
       </div>
     </div>
     <div class="rail-foot">
+      <div class="nav"><button type="button" class="nav-btn" data-tour="tour" onClick=${() => { setState({ railOpen: false }); startTour(); }}><${Icon} name="compass" />Take the tour</button></div>
       ${canInstall() && html`<div class="nav"><button type="button" class="nav-btn" onClick=${() => { setState({ railOpen: false }); openInstallSheet(); }}><${Icon} name="addSquare" />Add to Home Screen</button></div>`}
-      ${admin && html`<div class="nav" style="margin-bottom:6px"><${NavLink} to="/admin" icon="shield" label="Admin" route=${route} count=${pendingMembers.length} /></div>`}
-      <a class="rail-user" href="#/profile"><${Avatar} person=${profile} size=${32} />
+      ${admin && html`<div class="nav" style="margin-bottom:6px"><${NavLink} to="/admin" icon="shield" label="Admin" route=${route} count=${pendingMembers.length} tour="nav-admin" /></div>`}
+      <a class="rail-user" href="#/profile" data-tour="me"><${Avatar} person=${profile} size=${32} />
         <span style="min-width:0"><b class="nowrap">${profile.name}</b><small>${profile.title || ROLE_LABEL[profile.role]}</small></span></a>
     </div>
   </nav>`;

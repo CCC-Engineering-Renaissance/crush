@@ -1,6 +1,6 @@
 // Calendar: meetings, build days, pool tests, competitions and outreach.
-import { html, useState, useMemo, Icon, Modal, openModal, Field, Seg, Chip, Loading, Empty, useAsync, toast, toastError, confirmDialog } from '../lib/ui.js';
-import { useStore, isLead, subteamById, subteamLabel, bump } from '../lib/store.js';
+import { html, useState, useEffect, useMemo, Icon, Modal, openModal, Field, Seg, Chip, Loading, Empty, Notice, useAsync, toast, toastError, confirmDialog } from '../lib/ui.js';
+import { useStore, isLead, isAdmin, subteamById, subteamLabel, bump } from '../lib/store.js';
 import {
   startOfDay, addDays, startOfWeek, startOfMonth, addMonths, isoDate, parseIsoDate, sameDay, fmtDate, fmtTime, fmtMonth, combine, timeInput,
 } from '../lib/time.js';
@@ -18,9 +18,11 @@ const typeColor = (t) => seriesColor((EVENT_TYPES[t] || EVENT_TYPES.other)[1]);
 
 export function CalendarView() {
   useTitle('Calendar');
-  const { api, profile } = useStore((s) => ({ api: s.api, profile: s.profile }));
+  const { api, profile, feedUrl } = useStore((s) => ({ api: s.api, profile: s.profile, feedUrl: s.settings.calendarFeedUrl }));
   const rev = useStore((s) => s.rev);
   const lead = isLead(profile);
+  // Members see Subscribe once an admin has set up the feed; admins always, so they find the setup.
+  const canSubscribe = api.mode === 'demo' || !!feedUrl || isAdmin(profile);
   const [view, setView] = useState(window.innerWidth < 700 ? 'agenda' : 'month');
   const [cursor, setCursor] = useState(startOfMonth(new Date()));
   const gridStart = startOfWeek(cursor);
@@ -32,8 +34,9 @@ export function CalendarView() {
 
   return html`<div class="content wide">
     <div class="page-head">
-      <div><h1>Calendar</h1><p>Meetings, build days, pool tests and outreach. Add any event to your own Google Calendar.</p></div>
+      <div><h1>Calendar</h1><p>Meetings, build days, pool tests and outreach. Subscribe to keep them in your own calendar app.</p></div>
       <div class="actions">
+        ${canSubscribe && html`<button class="btn" onClick=${openSubscribe}><${Icon} name="link" />Subscribe</button>`}
         <${Seg} label="View" value=${view} onChange=${setView} options=${[['month', 'Month'], ['agenda', 'Upcoming']]} />
         ${lead && html`<button class="btn btn-primary" onClick=${() => openEventEditor(null)}><${Icon} name="plus" />New event</button>`}
       </div>
@@ -89,6 +92,103 @@ function openDayList(day, list) {
     <ul class="list">${list.map((e) => html`<li key=${e.id}><span class="grow"><button class="link-btn" style="text-decoration:none;color:var(--text)" onClick=${() => { close(); openEventDetail(e); }}>${e.title}</button>
       <div class="meta">${fmtTime(e.start)} – ${fmtTime(e.end)}</div></span></li>`)}</ul>
   </${Modal}>`);
+}
+
+// ── Subscribing: each member's own link for their calendar app ──
+// The link is the calendar-feed script's address plus a random id. The id is saved with the
+// subteams it shows, so changing them later keeps the same link.
+const SAMPLE_FEED = 'https://script.google.com/macros/s/sample-calendar-feed/exec';
+const newFeedId = () => {
+  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => abc[b % 62]).join('');
+};
+const sameSet = (a = [], b = []) => a.length === b.length && a.every((x) => b.includes(x));
+
+export function openSubscribe() {
+  openModal((close) => html`<${Subscribe} close=${close} />`);
+}
+
+function Subscribe({ close }) {
+  const { api, profile, feedUrl } = useStore((s) => ({ api: s.api, profile: s.profile, feedUrl: s.settings.calendarFeedUrl }));
+  const demo = api.mode === 'demo';
+  const base = demo ? SAMPLE_FEED : String(feedUrl || '').trim();
+  const res = useAsync(() => api.getMyCalendarFeed(profile.uid), [api, profile.uid]);
+  const [saved, setSaved] = useState(undefined); // undefined: loading; null: no link yet
+  const [f, setF] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (res.loading || saved !== undefined) return;
+    const s0 = res.data || null;
+    setSaved(s0);
+    setF(s0 ? { subteams: s0.subteams || [], everything: !!s0.everything } : { subteams: profile.subteams || [], everything: false });
+  }, [res.loading]);
+
+  const footer = html`<button class="btn" onClick=${close}>Done</button>`;
+  if (!base) {
+    return html`<${Modal} title="Subscribe to the calendar" onClose=${close} footer=${footer}>
+      <${Notice}>Calendar subscriptions aren’t turned on yet.${isAdmin(profile) ? html` Turn them on in <a href="#/admin/settings" onClick=${close}>Admin → Settings</a>. SETUP.md step 9 walks through it.` : ' An admin can turn them on.'}</${Notice}>
+    </${Modal}>`;
+  }
+  if (res.error) return html`<${Modal} title="Subscribe to the calendar" onClose=${close} footer=${footer}><${Notice} kind="bad">Couldn’t load your calendar link. Try again.</${Notice}></${Modal}>`;
+  if (saved === undefined || !f) return html`<${Modal} title="Subscribe to the calendar" onClose=${close} footer=${footer}><${Loading} /></${Modal}>`;
+
+  const url = saved ? `${base}?k=${saved.id}` : '';
+  const webcal = url.replace(/^https:/, 'webcal:');
+  const dirty = saved && (f.everything !== !!saved.everything || !sameSet(f.subteams, saved.subteams));
+  const save = async (fresh) => {
+    setBusy(true);
+    try {
+      const id = fresh ? newFeedId() : saved.id;
+      await api.saveMyCalendarFeed(profile.uid, { id, subteams: f.subteams, everything: f.everything }, fresh);
+      setSaved({ id, subteams: f.subteams, everything: f.everything });
+      toast(fresh ? 'Your calendar link is ready.' : 'Saved. Your calendar app picks this up the next time it checks.');
+    } catch (e) { toastError(e); }
+    setBusy(false);
+  };
+  const turnOff = async () => {
+    const ok = await confirmDialog({ title: 'Turn off your calendar link?', body: 'Calendars subscribed with it will empty out. You can get a new link any time.', confirmLabel: 'Turn off', danger: true });
+    if (!ok) return;
+    try { await api.deleteMyCalendarFeed(saved.id); setSaved(null); toast('Your calendar link is turned off.'); } catch (e) { toastError(e); }
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2200); }
+    catch { document.getElementById('feed-url')?.select(); }
+  };
+  return html`<${Modal} title="Subscribe to the calendar" onClose=${close} footer=${footer}>
+    <div class="stack" style="gap:20px">
+      <p style="margin:0;color:var(--text-2)">Your own link for Google Calendar, Apple Calendar or Outlook. New and changed events show up there on their own.</p>
+      ${demo && html`<${Notice}>This is the demo, so the link is a sample that calendar apps can’t open.</${Notice}>`}
+      <section aria-labelledby="feed-what">
+        <h3 class="mini-head" id="feed-what">What’s on it</h3>
+        <${Seg} label="What’s on it" value=${f.everything ? 'all' : 'mine'} onChange=${(v) => setF({ ...f, everything: v === 'all' })}
+          options=${[['mine', 'Subteams I pick'], ['all', 'Everything']]} />
+        ${f.everything
+          ? html`<p class="small muted" style="margin:10px 0 0">Every club event, for every subteam.</p>`
+          : html`<p class="small muted" style="margin:10px 0 10px">Club-wide events are always on it. Add the subteams whose events you want too.</p>
+            <${SubteamPicker} value=${f.subteams} onChange=${(v) => setF({ ...f, subteams: v })} />`}
+      </section>
+      <section aria-labelledby="feed-link">
+        <h3 class="mini-head" id="feed-link">Your link</h3>
+        ${!saved
+          ? html`<button class="btn btn-primary" onClick=${() => save(true)} disabled=${busy}>${busy ? 'Making your link…' : 'Get my link'}</button>`
+          : html`<div class="stack" style="gap:12px">
+            ${dirty && html`<div class="row wrap" style="gap:10px"><button class="btn btn-primary" onClick=${() => save(false)} disabled=${busy}>${busy ? 'Saving…' : 'Save changes'}</button>
+              <span class="small muted">Your link stays the same.</span></div>`}
+            <div class="row" style="gap:8px">
+              <input id="feed-url" class="input" readonly value=${url} aria-label="Your calendar link" onFocus=${(e) => e.target.select()} style="flex:1;min-width:0" />
+              <button class="btn" onClick=${copy}><${Icon} name=${copied ? 'check' : 'copy'} />${copied ? 'Copied' : 'Copy'}</button>
+            </div>
+            ${!demo && html`<div class="row wrap" style="gap:8px">
+              <a class="btn" href=${'https://calendar.google.com/calendar/render?cid=' + encodeURIComponent(webcal)} target="_blank" rel="noopener">Add to Google Calendar</a>
+              <a class="btn" href=${webcal}>Add to Apple Calendar</a>
+            </div>`}
+            <p class="small muted" style="margin:0">Outlook: <b>Add calendar → Subscribe from web</b>, then paste the link. Calendar apps check for changes on their own schedule: Google Calendar can take up to a day, Apple Calendar and Outlook are usually quicker.</p>
+            <div><button class="btn btn-quiet btn-sm" onClick=${turnOff}>Turn off this link</button></div>
+          </div>`}
+      </section>
+    </div>
+  </${Modal}>`;
 }
 
 // ── Event detail ──

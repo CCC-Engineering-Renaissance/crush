@@ -1,12 +1,13 @@
-# Runs the member portal's security-rule tests and the Discord bot's tests whenever either changes.
+# Runs the member portal's security-rule tests and the Discord bot's and calendar feed's tests whenever
+# any of them changes.
 # Results show in the repository's Actions tab. Nothing here deploys anything.
 name: Portal checks
 
 on:
   push:
-    paths: ['firebase/**', 'discord-bot/**', '.github/workflows/portal-checks.yml']
+    paths: ['firebase/**', 'discord-bot/**', 'calendar-feed/**', '.github/workflows/portal-checks.yml']
   pull_request:
-    paths: ['firebase/**', 'discord-bot/**']
+    paths: ['firebase/**', 'discord-bot/**', 'calendar-feed/**']
   workflow_dispatch:
 
 permissions:
@@ -32,7 +33,7 @@ jobs:
       - run: npm test
 
   discord-bot:
-    name: Discord bot
+    name: Discord bot and calendar feed
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -40,3 +41,4 @@ jobs:
         with:
           node-version: '22'
       - run: node --test discord-bot/bot.test.mjs
+      - run: node --test calendar-feed/feed.test.mjs

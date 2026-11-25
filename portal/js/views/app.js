@@ -5,6 +5,7 @@ import { DemoBar, initTheme, SubteamPicker } from './common.js';
 import { BullArt } from './bull-art.js';
 import { Portal } from './shell.js';
 import { InstallSheet } from './install.js';
+import { TourHost } from './tour.js';
 
 function demoRequested() {
   try { return sessionStorage.getItem('er-demo') === '1' || new URLSearchParams(location.search).has('demo'); } catch { return false; }
@@ -68,7 +69,7 @@ export function App({ config }) {
   else if (profile.status !== 'active') screen = html`<${NoAccess} />`;
   else screen = html`<${Portal} />`;
 
-  return html`${mode === 'demo' && !(profile && profile.status === 'active') ? html`<${DemoBar} />` : null}${screen}<${InstallSheet} /><${ModalHost} /><${Toasts} />`;
+  return html`${mode === 'demo' && !(profile && profile.status === 'active') ? html`<${DemoBar} />` : null}${screen}<${InstallSheet} /><${TourHost} /><${ModalHost} /><${Toasts} />`;
 }
 
 function Boot() {
@@ -146,7 +147,8 @@ function SignIn() {
   const [error, setError] = useState('');
   const go = async () => {
     setBusy(true); setError('');
-    try { await api.signIn(); } catch (e) { setError(friendlyError(e, 'Sign-in didn’t finish. Try again.')); } finally { setBusy(false); }
+    // In the demo, every sign-in starts the tour (the live portal shows it on a member's first visit).
+    try { await api.signIn(); setState({ tourAfterSignIn: true }); } catch (e) { setError(friendlyError(e, 'Sign-in didn’t finish. Try again.')); } finally { setBusy(false); }
   };
   return html`<${Gate} title="Your lab hours, docs and tasks."
     lede="The member portal for Engineering Renaissance and the Crush Depth ROV team at Clovis Community College. Clock in from your phone, find the team’s Drive docs and pick up tasks."

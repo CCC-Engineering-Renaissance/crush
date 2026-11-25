@@ -11,6 +11,7 @@ export const DEFAULT_SETTINGS = {
   termGoalHours: 40,
   weeklyGoalHours: 4,
   maxSessionHours: 10,
+  calendarFeedUrl: '',   // the calendar-feed script's web app address (SETUP.md step 9)
   locationCheck: { enabled: false, mode: 'flag', lat: null, lng: null, radiusM: 250 },
 };
 
@@ -30,6 +31,7 @@ const state = {
   pendingMembers: [],
   membersCache: null,
   railOpen: false,
+  tourAfterSignIn: false,
   paletteOpen: false,
   theme: 'system',
   rev: 0,               // bumped after edits so lists that aren't live re-load

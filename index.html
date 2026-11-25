@@ -156,6 +156,16 @@ p{text-wrap:pretty}
 .motion-btn[aria-pressed=true] .i-play{display:block}
 .motion-btn[aria-pressed=true] .i-pause{display:none}
 
+/* The competition: the team's logo beside MATE's, in the space next to the intro */
+.comp-intro{display:flex;align-items:center;justify-content:space-between;gap:36px 64px;margin-bottom:56px}
+.comp-intro .section-head{margin-bottom:0}
+.comp-logos{display:flex;align-items:center;gap:32px;flex:none}
+.comp-logos img{display:block;height:auto}
+.comp-logo-team{width:116px}
+.comp-logo-mate{width:200px}
+.comp-logos-rule{width:1px;height:96px;background:var(--line-2)}
+@media (max-width:1000px){.comp-intro{flex-direction:column;align-items:flex-start}.comp-logos{gap:24px}.comp-logo-team{width:88px}.comp-logo-mate{width:156px}.comp-logos-rule{height:72px}}
+
 /* Sponsor strip */
 .strip{padding:44px 0;border-bottom:1px solid var(--line)}
 .strip .wrap{display:flex;align-items:center;gap:40px;flex-wrap:wrap}
@@ -645,9 +655,16 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
 
   <section class="section">
     <div class="wrap">
-      <div class="section-head">
-        <h2 class="h2">The competition</h2>
-        <p class="lede">The MATE ROV Competition challenges student teams worldwide to design and build underwater robots that complete tasks modeled on real ocean work, from deep-sea exploration to marine archaeology.</p>
+      <div class="comp-intro">
+        <div class="section-head">
+          <h2 class="h2">The competition</h2>
+          <p class="lede">The MATE ROV Competition challenges student teams worldwide to design and build underwater robots that complete tasks modeled on real ocean work, from deep-sea exploration to marine archaeology.</p>
+        </div>
+        <div class="comp-logos">
+          <img class="comp-logo-team" src="crushdepth-logo.png" alt="Crush Depth" width="340" height="469" loading="lazy" decoding="async">
+          <span class="comp-logos-rule" aria-hidden="true"></span>
+          <img class="comp-logo-mate" src="mate-rov-logo.png" alt="MATE ROV Competition" width="472" height="231" loading="lazy" decoding="async">
+        </div>
       </div>
       <div data-photos>
         <div class="photo-grid g2">

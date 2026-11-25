@@ -146,6 +146,9 @@ export function createDemoBackend() {
     async updateEntryDetails(id, p) { await wait(); patch('timeEntries', id, p); emit('timeEntries'); },
     async deleteEntry(id) { await wait(); delete coll('timeEntries')[id]; emit('timeEntries'); },
 
+    async getMyCalendarFeed(uid) { await wait(); return rows('calendarFeeds').find((f) => f.uid === uid) || null; },
+    async saveMyCalendarFeed(uid, { id, subteams, everything }) { await wait(); patch('calendarFeeds', id, { uid, subteams, everything, updatedAt: new Date() }); emit('calendarFeeds'); return id; },
+    async deleteMyCalendarFeed(id) { await wait(); delete coll('calendarFeeds')[id]; emit('calendarFeeds'); },
     async listEvents(from, to) { await wait(); return rows('events').filter((e) => inRange(e.start, from, to)).sort((a, b) => a.start - b.start); },
     async saveEvents(events, me) {
       await wait();

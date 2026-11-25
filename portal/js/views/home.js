@@ -1,4 +1,4 @@
-// Home: the clock-in panel first, then hours, who's in the lab, news, events and tasks.
+// Home: the clock-in panel first, then hours, who's working, news, events and tasks.
 import { html, useState, useEffect, useMemo, Icon, Avatar, Chip, useNow, useAsync, toast, toastError, Notice, Loading } from '../lib/ui.js';
 import { useStore, isLead, isAdmin, activityById, subteamById, getState, visibleSpaces, spaceLabel } from '../lib/store.js';
 import { href } from '../lib/router.js';
@@ -127,7 +127,7 @@ export function ClockPanel({ events = [] }) {
   const act = mine ? activityById(mine.activityId) : null;
   const visibleActs = showAll ? activities.filter((a) => !a.archived) : myActs.slice(0, 7);
 
-  return html`<section class="clock" aria-label="Time clock">
+  return html`<section class="clock" aria-label="Time clock" data-tour="clock">
     <${Contours} cx=${880} cy=${80} rings=${10} step=${70} />
     <p class="greet">${greeting()}, ${profile.name.split(' ')[0]}</p>
     <div class="state">${mine
@@ -185,7 +185,7 @@ function StaleSession({ mine }) {
       toast('Sent. A lead will approve your session.');
     } catch (ex) { toastError(ex, 'That didn’t go through. Try again.'); setBusy(false); }
   };
-  return html`<section class="clock stale" aria-label="Fix your last session">
+  return html`<section class="clock stale" aria-label="Fix your last session" data-tour="clock">
     <${Contours} cx=${880} cy=${80} rings=${10} step=${70} />
     <p class="greet">${greeting()}, ${profile.name.split(' ')[0]}</p>
     <div class="state"><${Icon} name="alert" size=${18} />You’re still clocked in from ${fmtDateTime(start)}</div>
@@ -235,14 +235,14 @@ function HoursPanel() {
   </section>`;
 }
 
-// ───────── Who's in the lab ─────────
+// ───────── Who's working ─────────
 function LabPanel() {
   const { presence, maxH } = useStore((s) => ({ presence: s.presence, maxH: s.settings.maxSessionHours || 10 }));
   const now = useNow(30000);
-  // Sessions past the limit are forgotten clock-outs, not people in the lab.
+  // Sessions past the limit are forgotten clock-outs, not people still working.
   const list = presence.filter((p) => now - new Date(p.start) <= maxH * 3600e3).sort((a, b) => new Date(a.start) - new Date(b.start));
-  return html`<section class="panel" aria-labelledby="lab-h">
-    <div class="panel-head"><h2 id="lab-h">In the lab now</h2><span class="num" style="font-size:20px">${list.length}</span></div>
+  return html`<section class="panel" aria-labelledby="lab-h" data-tour="working">
+    <div class="panel-head"><h2 id="lab-h">Working currently</h2><span class="num" style="font-size:20px">${list.length}</span></div>
     <div class="panel-body">
       ${list.length ? html`<div class="lab-list">${list.slice(0, 8).map((p) => {
         const act = activityById(p.activityId);
