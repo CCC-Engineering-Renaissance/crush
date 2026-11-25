@@ -105,11 +105,6 @@ p{text-wrap:pretty}
 .btn-sm{min-height:38px;padding:0 14px;font-size:14.5px;border-radius:10px}
 
 /* Copy box (an address in mono with a copy button) */
-.copy-box{display:flex;align-items:stretch;width:fit-content;max-width:100%;margin-top:28px;border:1px solid var(--line-2);border-radius:11px;background:#fff;box-shadow:0 1px 0 var(--line-2);overflow:hidden}
-.copy-box code{min-width:0;padding:12px 16px;font-family:var(--mono);font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:all}
-.copy-box button{flex:none;min-width:116px;padding:0 16px;border:0;border-left:1px solid var(--line-2);background:transparent;font-size:14px;font-weight:600;color:var(--ink);transition:background .15s}
-.copy-box button:hover{background:var(--bg-2)}
-.copy-box button:focus-visible{outline-offset:-3px}
 .note{margin-top:12px;font-size:14.5px;color:var(--muted)}
 
 /* Navigation */
@@ -139,7 +134,6 @@ p{text-wrap:pretty}
 .hero-title{font-size:clamp(3rem,1rem + 5.6vw,6.6rem);line-height:.94;font-weight:750;letter-spacing:-.048em;color:var(--ink)}
 .hero-lede{font-size:clamp(1.06rem,1rem + .3vw,1.2rem);line-height:1.58;color:var(--text);max-width:30em}
 .hero-side .actions{margin-top:26px}
-.hero-side .copy-box{margin-top:16px}
 .hero.enter .hero-title,.hero.enter .hero-side{animation:rise .7s cubic-bezier(.22,1,.36,1) both}
 .hero.enter .hero-side{animation-delay:.1s}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}}
@@ -434,8 +428,6 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
   .footer-grid>div:first-child{grid-column:1/-1}
   .page-head{padding:56px 0 48px}
   .actions .btn{flex:1 1 auto}
-  .copy-box{width:100%}
-  .copy-box code{flex:1}
   .join{padding:48px 24px;border-radius:18px}
   .join.has-steps{grid-template-columns:minmax(0,1fr);gap:32px}
   .strip .wrap{gap:20px}
@@ -443,9 +435,6 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
   .strip img{height:32px}
 }
 @media (max-width:560px){
-  .copy-box{flex-direction:column}
-  .copy-box code{padding:12px 14px;font-size:13px;text-align:center}
-  .copy-box button{min-height:44px;border-left:0;border-top:1px solid var(--line-2)}
   .hero-art .motion-btn{top:0;bottom:auto}
 }
 @media (prefers-reduced-motion:reduce){
@@ -500,7 +489,6 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
           <a class="btn btn-primary" href="portal/">Join the club</a>
           <a class="btn" href="#crushdepth" data-go="crushdepth">See Crush Depth</a>
         </div>
-        <div class="copy-box"><code id="club-email">cccengineeringrenaissance@gmail.com</code><button type="button" data-copy="club-email">Copy email</button></div>
         <p class="note">No experience needed. Bring curiosity and a willingness to learn.</p>
         </div>
       </div>
@@ -1175,14 +1163,6 @@ function toggleMobile(){const m=document.getElementById('mobileMenu');const open
 function closeMobile(){document.getElementById('mobileMenu').classList.remove('open');document.querySelector('.menu-btn').setAttribute('aria-expanded','false')}
 document.addEventListener('click',e=>{const a=e.target.closest('[data-go]');if(!a||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey||e.button)return;e.preventDefault();go(a.dataset.go)});
 window.addEventListener('popstate',()=>go(location.hash.slice(1)||'home',true));
-
-// ── Copy the club's email address ──
-document.addEventListener('click',async e=>{
-  const b=e.target.closest('[data-copy]');if(!b)return;
-  const src=document.getElementById(b.dataset.copy);
-  try{await navigator.clipboard.writeText(src.textContent.trim());const was=b.textContent;b.textContent='Copied';setTimeout(()=>{b.textContent=was},2200)}
-  catch{const r=document.createRange();r.selectNodeContents(src);const sel=getSelection();sel.removeAllRanges();sel.addRange(r)}
-});
 
 // ── One switch pauses every animation: the ASCII art (window.setArtPaused) and the pool light ──
 function setMotionPaused(paused){
