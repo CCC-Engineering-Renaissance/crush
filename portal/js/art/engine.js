@@ -11,11 +11,16 @@
 //
 // Colours come from CSS custom properties on the box: --art-stream, --art-light, --art-grey,
 // --art-ink, --art-green, --art-blue, --art-hot, --art-hot-2, --art-label, --art-name, --art-line.
-// The logos resolve from noise once per page load; after that the loop stays quiet. Everything
+// The logos resolve from noise once per page load; after that the loop stays quiet. Moving the
+// pointer over a logo leaves a short trail: the characters under it scramble in the highlight
+// colour, then cool back into the picture (a tap does the same on a touch screen). Everything
 // stands still under prefers-reduced-motion, and nothing is drawn while the tab is hidden, the
 // box is off screen, or the art is paused.
 
 const RAMP = ' .:-=+*#%@';
+const HEAT_PX = 56; // how far the pointer's trail reaches, in CSS pixels
+const HEAT_TAU = 0.2; // seconds for a hot character to cool by two thirds; clear in about two thirds of a second
+const SPARK = '01#%@*+=<>/\\|&$';
 const TONE = [0, 0, 0.34, 0.58, 1, 0.86, 0.86]; // ink per class (see the map files)
 const CLASS_COLOR = [null, null, '--art-light', '--art-grey', '--art-ink', '--art-green', '--art-blue'];
 const COLOR_VARS = ['--art-stream', '--art-light', '--art-grey', '--art-ink', '--art-green', '--art-blue', '--art-hot', '--art-hot-2', '--art-label', '--art-name', '--art-line'];
@@ -82,7 +87,7 @@ export function createAsciiArt(box, canvas, scene) {
     W: 0, H: 0, dpr: 1, fs: 11, lfs: 12, cw: 7, chh: 14, cols: 0, rows: 0,
     L: null, placed: [], owner: null, ownerIdx: null, colors: {}, layer: null,
     drifters: [], packets: [], labelState: labels.map(() => ({ flash: 0, done: false })),
-    clock: 0, nextPacket: 0.4, nextLabel: 0, packetColor: 0, spark: null,
+    clock: 0, nextPacket: 0.4, nextLabel: 0, packetColor: 0, spark: null, warm: false, ptr: null,
     raf: 0, last: 0, running: false, paused: false, visible: true, ready: false,
     intro: !played.has(key) && !reduced(),
   };
@@ -115,6 +120,7 @@ export function createAsciiArt(box, canvas, scene) {
     return {
       ...logo, lx, ly, lc, lr, ...sampleLogo(logo.map, lc, lr),
       jitter: new Float32Array(lc * lr).map(() => Math.random()),
+      heat: new Float32Array(lc * lr), hot: [], // the pointer's trail: heat per cell, and which cells are warm
       mid: lx + lc / 2,
     };
   }
@@ -269,8 +275,98 @@ export function createAsciiArt(box, canvas, scene) {
     indexCells();
     seedDrifters();
     buildLayer();
+    st.warm = false;
+    st.ptr = null;
     st.ready = true;
     draw();
+  }
+
+  // ── The pointer's trail ──
+  // Cells within reach of the point (x, y), in CSS pixels on the canvas, warm up: the closer, the hotter.
+  function heatAt(x, y, reach) {
+    const rx = reach / st.cw;
+    const ry = reach / st.chh;
+    const gx = x / st.cw;
+    const gy = y / st.chh;
+    for (let row = Math.floor(gy - ry); row <= gy + ry; row++) {
+      for (let col = Math.floor(gx - rx); col <= gx + rx; col++) {
+        const hit = cellAt(col, row);
+        if (!hit) continue;
+        const d = Math.hypot((col + 0.5 - gx) / rx, (row + 0.5 - gy) / ry);
+        if (d >= 1) continue;
+        const { p, i } = hit;
+        if (!p.heat[i]) p.hot.push(i);
+        p.heat[i] = Math.max(p.heat[i], 1 - d);
+        st.warm = true;
+      }
+    }
+  }
+
+  function onPointer(e, reach, path) {
+    if (!st.running || st.clock < INTRO) return;
+    const r = canvas.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
+    const prev = path ? st.ptr : null;
+    st.ptr = { x, y };
+    const wasWarm = st.warm;
+    // Fill in between pointer events, so a quick sweep leaves an unbroken trail.
+    const gap = prev ? Math.hypot(x - prev.x, y - prev.y) : 0;
+    const steps = gap > 0 && gap < HEAT_PX * 6 ? Math.min(12, Math.ceil(gap / (HEAT_PX * 0.4))) : 1;
+    for (let s = 1; s <= steps; s++) {
+      const f = steps > 1 ? s / steps : 1;
+      heatAt(prev && steps > 1 ? prev.x + (x - prev.x) * f : x, prev && steps > 1 ? prev.y + (y - prev.y) * f : y, reach);
+    }
+    if (st.warm && !wasWarm) st.last = performance.now() - 48; // show it on the very next frame
+  }
+  const onPointerMove = (e) => onPointer(e, HEAT_PX, true);
+  const onPointerDown = (e) => onPointer(e, HEAT_PX * 1.5, false); // a tap leaves a bigger splash
+  const onPointerLeave = () => { st.ptr = null; };
+
+  // Cooling: heat falls off smoothly; cells that are cold again leave the warm list.
+  function cool(dt) {
+    if (!st.warm) return;
+    const k = dt === Infinity ? 0 : Math.exp(-dt / HEAT_TAU);
+    let any = false;
+    for (const p of st.placed) {
+      if (!p.hot.length) continue;
+      const keep = [];
+      for (const i of p.hot) {
+        p.heat[i] *= k;
+        if (p.heat[i] < 0.04) p.heat[i] = 0;
+        else keep.push(i);
+      }
+      p.hot = keep;
+      if (keep.length) any = true;
+    }
+    st.warm = any;
+  }
+
+  // Hot characters scramble in the highlight colour, a little larger; cooling ones scramble in their
+  // own colour, then thicken for a moment before they settle back into the picture.
+  function drawHeat() {
+    if (!st.warm) return;
+    const spark = () => SPARK[(Math.random() * SPARK.length) | 0];
+    const cores = [];
+    ctx.font = font(st.fs, 500);
+    for (const p of st.placed) {
+      for (const i of p.hot) {
+        const h = p.heat[i];
+        const cx = i % p.lc;
+        const col = p.lx + cx;
+        const row = p.ly + (i - cx) / p.lc;
+        if (h > 0.45) { ctx.clearRect(col * st.cw, row * st.chh, st.cw, st.chh); cores.push(col, row); continue; }
+        const own = color(CLASS_COLOR[p.cl[i]]);
+        glyph(h > 0.2 ? spark() : RAMP[Math.min(9, p.ch[i] + 2)], col, row, own, 1, true);
+      }
+    }
+    // The hottest last, so their larger characters sit on top of their neighbours.
+    ctx.font = font(st.fs * 1.15, 500);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = color('--art-hot');
+    for (let j = 0; j < cores.length; j += 2) ctx.fillText(spark(), (cores[j] + 0.5) * st.cw, cores[j + 1] * st.chh + st.chh / 2);
+    ctx.textAlign = 'left';
+    ctx.font = font(st.fs);
   }
 
   function glyph(chr, col, row, fill, alpha = 1, clear = false) {
@@ -455,6 +551,7 @@ export function createAsciiArt(box, canvas, scene) {
     drawLogos(t);
     drawEffects(t);
     drawDrifters(t);
+    drawHeat();
     drawPackets();
     ctx.font = font(st.fs);
     drawGateLine(t);
@@ -480,6 +577,7 @@ export function createAsciiArt(box, canvas, scene) {
   function step(dt) {
     const { L } = st;
     st.clock += dt;
+    cool(dt);
     for (const d of st.drifters) {
       if (flow === 'up') { d.y -= d.speed * dt; if (d.y < -1) respawn(d, false); }
       else { d.x += d.speed * dt; if (d.x - d.len > L.end) respawn(d, false); }
@@ -507,7 +605,8 @@ export function createAsciiArt(box, canvas, scene) {
     if (!st.running) return;
     st.raf = requestAnimationFrame(frame);
     const elapsed = now - st.last;
-    if (elapsed < 48) return; // about 20 frames a second is plenty for drifting characters
+    // About 20 frames a second is plenty for drifting characters; a pointer trail gets the full rate.
+    if (elapsed < (st.warm ? 15 : 48)) return;
     st.last = now;
     step(Math.min(0.1, elapsed / 1000));
     draw();
@@ -518,13 +617,19 @@ export function createAsciiArt(box, canvas, scene) {
     st.clock = Math.max(st.clock, INTRO + 1);
     for (const lb of st.labelState) { lb.done = true; lb.flash = 0; }
     st.packets = [];
+    cool(Infinity);
     draw();
   }
 
   function sync() {
     const go = st.ready && !st.paused && st.visible && !document.hidden && !reduced();
     if (go && !st.running) { st.running = true; st.last = performance.now(); st.raf = requestAnimationFrame(frame); }
-    if (!go && st.running) { st.running = false; cancelAnimationFrame(st.raf); }
+    if (!go && st.running) {
+      st.running = false;
+      cancelAnimationFrame(st.raf);
+      // Stopping mid-trail: let the trail go, so the picture doesn't freeze half scrambled.
+      if (st.warm) { cool(Infinity); draw(); }
+    }
     if (st.ready && reduced()) settle();
   }
 
@@ -550,6 +655,9 @@ export function createAsciiArt(box, canvas, scene) {
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     document.addEventListener('visibilitychange', onVisibility);
     if (reduceQuery && reduceQuery.addEventListener) reduceQuery.addEventListener('change', onMotion);
+    box.addEventListener('pointermove', onPointerMove, { passive: true });
+    box.addEventListener('pointerdown', onPointerDown, { passive: true });
+    box.addEventListener('pointerleave', onPointerLeave, { passive: true });
     sync();
   });
 
@@ -563,6 +671,9 @@ export function createAsciiArt(box, canvas, scene) {
       ro.disconnect(); io.disconnect(); mo.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
       if (reduceQuery && reduceQuery.removeEventListener) reduceQuery.removeEventListener('change', onMotion);
+      box.removeEventListener('pointermove', onPointerMove);
+      box.removeEventListener('pointerdown', onPointerDown);
+      box.removeEventListener('pointerleave', onPointerLeave);
     },
   };
 }
