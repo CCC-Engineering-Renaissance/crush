@@ -228,6 +228,22 @@ p{text-wrap:pretty}
 .awards-card span{font-size:16.5px;font-weight:550}
 
 /* Crush Depth page header on the water */
+/* Team photos in the pool. Desktop: the team photo large on the left, two beside it, two below. */
+.reel{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:18px}
+.reel figure{position:relative;margin:0;overflow:hidden;border-radius:var(--r);background:var(--water-deep);box-shadow:0 18px 44px rgba(6,26,64,.38),0 2px 6px rgba(6,26,64,.2);transition:transform .45s cubic-bezier(.2,.7,.2,1),box-shadow .45s}
+.reel img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.reel figure::after{content:"";position:absolute;inset:-400px -400px 0 0;background:url(caustics.png) 0 0/400px 400px;opacity:.22;pointer-events:none;animation:caustics-b 34s linear infinite;transition:opacity .45s}
+.reel .r-1{grid-column:1/5;grid-row:1/3;aspect-ratio:3/2}
+.reel .r-2{grid-column:5/7;grid-row:1}
+.reel .r-3{grid-column:5/7;grid-row:2}
+.reel .r-4{grid-column:1/4;grid-row:3;aspect-ratio:3/2}
+.reel .r-5{grid-column:4/7;grid-row:3;aspect-ratio:3/2}
+@media (hover:hover){.reel figure:hover{transform:translateY(-6px) scale(1.015);box-shadow:0 28px 60px rgba(6,26,64,.45),0 3px 8px rgba(6,26,64,.22)}.reel figure:hover::after{opacity:0}}
+.motion-paused .reel figure::after{animation-play-state:paused}
+@media (hover:none){.reel figure::after{opacity:.14}} /* touch screens can't hover to clear it */
+@media (prefers-reduced-motion:reduce){.reel figure:hover{transform:none}}
+@media (max-width:900px){.reel{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.reel .r-1{grid-column:1/3;grid-row:auto}.reel .r-2,.reel .r-3,.reel .r-4,.reel .r-5{grid-column:auto;grid-row:auto;aspect-ratio:4/3}}
+@media (max-width:560px){.reel{grid-template-columns:minmax(0,1fr)}.reel .r-1,.reel .r-2,.reel .r-3,.reel .r-4,.reel .r-5{grid-column:auto;aspect-ratio:3/2}}
 .pool-head{padding:96px 0 104px}
 .pool-head .wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);gap:40px;align-items:center}
 .pool-head .h1{color:#fff}
@@ -597,18 +613,23 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
     </div>
   </section>
 
-  <section data-photos class="section">
+  <section class="pool pool-band">
+    <!-- Team photos in the pool: each sits under its own drifting water light, and hovering one lifts it and
+         clears the light, as if it came up to the surface -->
+    <div class="pool-light" aria-hidden="true"></div>
+    <div class="lane top" aria-hidden="true"></div>
     <div class="wrap">
-      <div class="section-head"><h2 class="h2">The team at work</h2></div>
-      <div class="photo-grid g3">
-        <div class="photo-slot" style="aspect-ratio:4/3"><img src="action-1.jpg" alt="Electronics work" decoding="async" onerror="hidePhoto(this)"></div>
-        <div class="photo-slot" style="aspect-ratio:4/3"><img src="action-2.jpg" alt="Assembling the ROV" decoding="async" onerror="hidePhoto(this)"></div>
-        <div class="photo-slot" style="aspect-ratio:4/3"><img src="action-3.jpg" alt="Testing the ROV" decoding="async" onerror="hidePhoto(this)"></div>
-        <div class="photo-slot" style="aspect-ratio:4/3"><img src="action-4.jpg" alt="Members working together" decoding="async" onerror="hidePhoto(this)"></div>
-        <div class="photo-slot" style="aspect-ratio:4/3"><img src="action-5.jpg" alt="Fabricating parts" decoding="async" onerror="hidePhoto(this)"></div>
-        <div class="photo-slot" style="aspect-ratio:4/3"><img src="action-6.jpg" alt="At the competition" decoding="async" onerror="hidePhoto(this)"></div>
+      <div class="section-head"><h2 class="h2">Where you'll find us</h2><p class="lede">At the MATE ROV Competition, at showcases with MESA, and at Clovis Community College events.</p></div>
+      <div class="reel">
+        <figure class="r-1"><img src="team-mate-rov.webp" alt="The team at the MATE ROV Competition, with a trophy and a medal" width="1200" height="800" loading="lazy" decoding="async"></figure>
+        <figure class="r-2"><img src="team-pool-deck.webp" alt="Students in life vests at the control station beside the pool" width="1200" height="901" loading="lazy" decoding="async"></figure>
+        <figure class="r-3"><img src="team-mesa.webp" alt="Students beside an ROV at a MESA showcase table" width="1200" height="867" loading="lazy" decoding="async"></figure>
+        <figure class="r-4"><img src="team-mascot.webp" alt="Six students pose with the Clovis Crush mascot" width="1200" height="809" loading="lazy" decoding="async"></figure>
+        <figure class="r-5"><img src="team-event.webp" alt="Three students in suits talk with a guest at a Clovis Community College event" width="1200" height="805" loading="lazy" decoding="async"></figure>
       </div>
     </div>
+    <div class="lane bottom" aria-hidden="true"></div>
+    <button class="motion-btn" type="button" aria-pressed="false" title="Pause the animations"><svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1" fill="currentColor"/><rect x="14" y="4.5" width="4" height="15" rx="1" fill="currentColor"/></svg><svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></svg><span class="sr-only">Pause the animations</span></button>
   </section>
 
   <section class="section">
