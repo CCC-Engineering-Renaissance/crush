@@ -217,7 +217,7 @@ p{text-wrap:pretty}
 .pool-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:56px;align-items:center}
 .pool-title{display:flex;align-items:center;justify-content:space-between;gap:24px}
 .pool-title .h2{flex:1 1 auto}
-.pool-logo{flex:none;width:auto;height:clamp(96px,10vw,136px);filter:drop-shadow(0 8px 18px rgba(9,30,66,.35))}
+.pool-logo{flex:none;width:auto;height:clamp(96px,10vw,136px);margin-right:clamp(12px,3vw,44px);filter:drop-shadow(0 8px 18px rgba(9,30,66,.35))}
 @media (max-width:560px){.pool-title{flex-direction:column-reverse;align-items:flex-start;gap:18px}.pool-logo{height:88px}}
 .awards-card{background:#fff;color:var(--ink);border-radius:18px;padding:28px 30px;box-shadow:0 24px 60px rgba(9,30,66,.32),0 2px 6px rgba(9,30,66,.18)}
 .awards-card h3{font-size:15px;font-weight:600;color:var(--muted)}
@@ -265,6 +265,45 @@ p{text-wrap:pretty}
 .signal.instant{transition:none}
 .signal path{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linejoin:round;stroke-linecap:round}
 @media (max-width:800px){.proj-media .proj-a{width:88%}.proj-media .proj-b{width:66%;margin-top:-16%}.signal-box{margin:44px 0 16px}.signal{height:56px}}
+
+/* Projects: from CAD to demo day. A trace runs down the three stages and fills with club blue as you
+   scroll; each stage's number lights up as you reach it. Photos keep their shape: a row shares one height. */
+.stages{list-style:none}
+.stage{position:relative;padding-left:76px}
+.stage+.stage{margin-top:80px}
+.stage::before,.stage::after{content:"";position:absolute;left:19px;top:44px;bottom:-76px;width:2px;border-radius:1px;background:var(--line-2)}
+.stage::after{background:var(--sky);transform-origin:top;transform:scaleY(var(--fill,0))}
+.stage:last-child::before,.stage:last-child::after{display:none}
+.stage-num{position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--bg);border:2px solid var(--line-2);font-family:var(--num);font-weight:700;font-size:15px;color:var(--muted);transition:border-color .3s,color .3s,box-shadow .3s}
+.stage.on .stage-num{border-color:var(--sky);color:var(--deep);box-shadow:0 0 0 6px rgba(44,181,222,.16)}
+.stage .h3{font-size:22px;padding-top:7px}
+.stage>p{margin-top:8px;max-width:60ch}
+.jrow{display:flex;gap:14px;margin-top:24px}
+.jrow+.jrow{margin-top:14px}
+.jrow figure{flex:var(--ar) 1 0;aspect-ratio:var(--ar)}
+.build figure{position:relative;margin:0;overflow:hidden;border-radius:var(--r);background:var(--bg-2);border:1px solid var(--line)}
+.build figure img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.build figcaption{position:absolute;left:10px;bottom:10px;padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.94);color:var(--ink);font-size:13px;font-weight:600;line-height:1.3;box-shadow:0 1px 3px rgba(17,19,24,.18)}
+.demo-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;margin-top:24px}
+.demo-grid .d-1{grid-column:1/5;grid-row:1/3;aspect-ratio:16/9}
+.demo-grid .d-2{grid-column:5/7;grid-row:1/3}
+.demo-grid .d-2 img{object-position:50% 42%}
+.demo-grid .d-3{grid-column:1/3;grid-row:3;aspect-ratio:16/9}
+.demo-grid .d-4{grid-column:3/5;grid-row:3;aspect-ratio:16/9}
+.demo-grid .d-5{grid-column:5/7;grid-row:3;aspect-ratio:16/9}
+.demo-grid .d-5 img{object-position:50% 70%}
+@media (max-width:800px){
+  .stage{padding-left:52px}
+  .stage+.stage{margin-top:64px}
+  .stage::before,.stage::after{left:15px;top:36px;bottom:-60px}
+  .stage-num{width:32px;height:32px;font-size:13px}
+  .stage .h3{font-size:20px;padding-top:4px}
+  .jrow{flex-direction:column}
+  .jrow figure{flex:none;width:100%}
+  .demo-grid{grid-template-columns:minmax(0,1fr)}
+  .demo-grid figure{grid-column:auto!important;grid-row:auto!important;aspect-ratio:16/9}
+  .demo-grid .d-2{aspect-ratio:4/5}
+}
 
 /* Photos and carousels */
 .photo-slot{width:100%;border-radius:var(--r);overflow:hidden;background:var(--bg-2);border:1px solid var(--line)}
@@ -321,6 +360,11 @@ p{text-wrap:pretty}
 .person .role{display:block;font-size:14.5px;font-weight:600;color:var(--deep);margin-top:2px}
 .person p{font-size:15px;margin-top:6px;line-height:1.55}
 .board+.board{margin-top:88px;padding-top:72px;border-top:1px solid var(--line)}
+/* ASCII art in the empty space beside each board's cards: the bull, Crush Depth and a gear. The script
+   places it after the last card in the rows that have room, and hides it when none do (phones). */
+.board{position:relative}
+.about-photo{display:block;width:100%;height:auto;border-radius:var(--r);box-shadow:0 1px 0 var(--line),0 16px 36px rgba(17,19,24,.12)}
+.board-art{position:absolute}
 
 /* Seasons */
 .timeline{list-style:none}
@@ -556,9 +600,12 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
   </header>
 
   <section class="section">
-    <div class="wrap prose">
-      <p>Engineering Renaissance is a student-run engineering club at Clovis Community College, dedicated to promoting excellence in STEM and higher education. Our mission is to further STEM in the Central Valley and showcase Clovis Community College internationally. Together, we keep showing that Crush has depth.</p>
-      <p>The club brings mechanical, electrical, software and business students together as one team. Through competitions like MATE ROV, hands-on projects and community outreach, members gain real experience with engineering concepts, CAD software, programming and technical skills that prepare them for careers and for transferring to four-year universities.</p>
+    <div class="wrap split">
+      <div class="prose">
+        <p>Engineering Renaissance is a student-run engineering club at Clovis Community College, dedicated to promoting excellence in STEM and higher education. Our mission is to further STEM in the Central Valley and showcase Clovis Community College internationally. Together, we keep showing that Crush has depth.</p>
+        <p>The club brings mechanical, electrical, software and business students together as one team. Through competitions like MATE ROV, hands-on projects and community outreach, members gain real experience with engineering concepts, CAD software, programming and technical skills that prepare them for careers and for transferring to four-year universities.</p>
+      </div>
+      <img class="about-photo" src="about-stage.webp" alt="Crush Depth members and the Pomona Subsea Initiative team from Cal Poly Pomona raise trophies together on stage" width="1400" height="933" loading="lazy" decoding="async">
     </div>
   </section>
 
@@ -571,7 +618,10 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
     </div>
   </section>
 
-  <section class="section alt">
+  <section class="section alt has-video">
+    <!-- A muted clip of a member testing a handheld controller, faint behind the section (loaded only when it scrolls near) -->
+    <video class="section-video" data-src="drives-loop.mp4" poster="drives-poster.jpg" muted loop playsinline preload="none"
+      aria-hidden="true" tabindex="-1" disablepictureinpicture disableremoteplayback></video>
     <div class="wrap">
       <div class="section-head"><h2 class="h2">What drives us</h2></div>
       <div class="items" id="about-values"></div>
@@ -601,14 +651,17 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
         <div class="section-head"><h2 class="h2">Executive board</h2><p class="lede">The officers who lead Engineering Renaissance.</p></div>
         <div class="people lead" id="exec-lead"></div>
         <div class="people" id="exec-rest" style="margin-top:36px"></div>
+        <div class="ascii-art board-art" data-ascii="team-exec" aria-hidden="true" hidden><canvas></canvas></div>
       </div>
       <div class="board">
         <div class="section-head"><h2 class="h2">Administrative board</h2><p class="lede">The directors who keep the club and Crush Depth running.</p></div>
         <div class="people" id="admin-people"></div>
+        <div class="ascii-art board-art" data-ascii="team-admin" aria-hidden="true" hidden><canvas></canvas></div>
       </div>
       <div class="board">
         <div class="section-head"><h2 class="h2">Club advisors</h2><p class="lede">Faculty mentors who guide Engineering Renaissance.</p></div>
         <div class="people" id="advisor-people"></div>
+        <div class="ascii-art board-art" data-ascii="team-advisors" aria-hidden="true" hidden><canvas></canvas></div>
       </div>
     </div>
   </section>
@@ -681,6 +734,48 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
           <li class="chip">Animatronics</li><li class="chip">Sensor integration</li><li class="chip">LED systems</li><li class="chip">Creative engineering</li>
         </ul>
       </div>
+    </div>
+  </section>
+
+  <section class="section build">
+    <div class="wrap">
+      <div class="section-head"><h2 class="h2">From CAD to demo day</h2><p class="lede">What a project looks like from the first model to the final presentation, in photos from recent builds.</p></div>
+      <ol class="stages">
+        <li class="stage">
+          <span class="stage-num" aria-hidden="true">01</span>
+          <h3 class="h3">Design it</h3>
+          <p>Teams model their parts in CAD, and some lay out their own circuit boards.</p>
+          <div class="jrow">
+            <figure style="--ar:1.114"><img src="build-turret.webp" alt="SolidWorks model of a turret with a barrel and a feed rail for gumballs" width="980" height="880" loading="lazy" decoding="async"><figcaption>Gumball-launching turret</figcaption></figure>
+            <figure style="--ar:1.108"><img src="build-board.webp" alt="3D render of a round circuit board with an ESP32 module, three stepper motor drivers and the club's bull logo" width="1110" height="1002" loading="lazy" decoding="async"><figcaption>Custom ESP32 board</figcaption></figure>
+          </div>
+          <div class="jrow">
+            <figure style="--ar:1.268"><img src="build-gearbox.webp" alt="Wireframe model of a planetary gearbox: a sun gear and three planet gears inside a ring gear" width="928" height="732" loading="lazy" decoding="async"><figcaption>Planetary gearbox</figcaption></figure>
+            <figure style="--ar:1.157"><img src="build-arm-cad.webp" alt="CAD model of a robotic arm with round joint housings" width="744" height="643" loading="lazy" decoding="async"><figcaption>Robotic arm</figcaption></figure>
+          </div>
+        </li>
+        <li class="stage">
+          <span class="stage-num" aria-hidden="true">02</span>
+          <h3 class="h3">Prototype and code it</h3>
+          <p>Circuits start on a breadboard, and the firmware gets written alongside them.</p>
+          <div class="jrow">
+            <figure style="--ar:0.75"><img src="build-breadboard.webp" alt="Overhead view of a breadboard circuit with an Arduino, a stepper motor, a servo and an AA battery pack" width="900" height="1200" loading="lazy" decoding="async"><figcaption>Breadboard prototype</figcaption></figure>
+            <figure style="--ar:1.674"><img src="build-firmware.webp" alt="C++ firmware for a tank controller that drives two tracks, two launch motors and a candy pusher" width="1580" height="944" loading="lazy" decoding="async"><figcaption>Tank controller firmware</figcaption></figure>
+          </div>
+        </li>
+        <li class="stage">
+          <span class="stage-num" aria-hidden="true">03</span>
+          <h3 class="h3">Present it</h3>
+          <p>Each team demos what they built and walks through what worked and what didn't.</p>
+          <div class="demo-grid">
+            <figure class="d-1"><img src="build-boards-team.webp" alt="Four students hold up their round circuit boards beside a motorized platform, in front of slides showing the board design" width="1400" height="788" loading="lazy" decoding="async"><figcaption>Boards in hand</figcaption></figure>
+            <figure class="d-2"><img src="build-arm-team.webp" alt="Four students stand behind a blue 3D-printed robotic arm" width="900" height="1200" loading="lazy" decoding="async"><figcaption>The robotic arm team</figcaption></figure>
+            <figure class="d-3"><img src="build-presenting.webp" alt="A student holds up a circuit board while his team presents their build" width="1400" height="788" loading="lazy" decoding="async"><figcaption>Walking through the build</figcaption></figure>
+            <figure class="d-4"><img src="build-terrarium.webp" alt="Two students point to a terrarium with automated watering and misting while presenting" width="1400" height="788" loading="lazy" decoding="async"><figcaption>Automated terrarium</figcaption></figure>
+            <figure class="d-5"><img src="build-led-team.webp" alt="Five team members stand beside their project, with an LED strip, a breadboard and 3D-printed parts on the table" width="1400" height="933" loading="lazy" decoding="async"><figcaption>LED project</figcaption></figure>
+          </div>
+        </li>
+      </ol>
     </div>
   </section>
 
@@ -950,7 +1045,7 @@ const subteamData=[
 ];
 const execData=[
   {name:'La Min Tun',role:'President',img:'Tun.png',desc:'Tun leads Engineering Renaissance and makes sure every part of the club succeeds.'},
-  {name:'Isaac Perry',role:'Vice President',img:'Isaac.png',desc:'Isaac organizes team workflows and keeps communication flowing across teams.'},
+  {name:'Isaac Perry',role:'Vice President',img:'isaac.webp',desc:'Isaac organizes team workflows and keeps communication flowing across teams.'},
   {name:'Santino Gonzales',role:'Treasurer',img:'santino.webp',desc:'Santino manages the club’s finances and handles legal and compliance work.'},
   {name:'Keira Batulayan',role:'Secretary',img:'keira.webp',desc:'Keira keeps records and meeting notes and keeps communication organized across the team.'},
 ];
@@ -1122,6 +1217,57 @@ function setMotionPaused(paused){
   window.syncSectionVideos=sync;
 })();
 document.addEventListener('click',e=>{const b=e.target.closest('.motion-btn');if(b)setMotionPaused(b.getAttribute('aria-pressed')!=='true')});
+// ── Team page: put each board's ASCII art in the empty space after its cards. Rows are read bottom up:
+//    a row counts if there's room to its right, and the art spans every counted row. ──
+(function(){
+  const boards=[...document.querySelectorAll('.board')].filter(b=>b.querySelector('.board-art'));
+  if(!boards.length||!window.ResizeObserver)return;
+  const GAP=48,MIN=260;
+  function place(board){
+    const art=board.querySelector('.board-art');
+    const b=board.getBoundingClientRect();
+    const rows=new Map();
+    board.querySelectorAll('.people > *').forEach(c=>{
+      const r=c.getBoundingClientRect();if(!r.width)return;
+      const k=Math.round(r.top),row=rows.get(k)||{top:r.top,bottom:r.bottom,right:r.right};
+      row.right=Math.max(row.right,r.right);row.bottom=Math.max(row.bottom,r.bottom);rows.set(k,row);
+    });
+    let left=0,top=null,bottom=null;
+    for(const row of [...rows.values()].sort((x,y)=>y.top-x.top)){
+      const l=Math.max(left,row.right-b.left+GAP);
+      if(b.width-l<MIN)break;
+      left=l;top=row.top-b.top;if(bottom===null)bottom=row.bottom-b.top;
+    }
+    if(top===null||!b.width){art.hidden=true;return}
+    Object.assign(art.style,{left:left+'px',top:top+'px',width:(b.width-left)+'px',height:(bottom-top)+'px'});
+    art.hidden=false;
+  }
+  const ro=new ResizeObserver(es=>es.forEach(e=>place(e.target)));
+  boards.forEach(b=>ro.observe(b));
+})();
+// ── Projects: the trace down the build stages fills with club blue as you scroll, and each stage's number
+//    lights up once the reading line (60% down the screen) reaches it. Fully lit with reduced motion. ──
+(function(){
+  const stages=[...document.querySelectorAll('.stage')];if(!stages.length)return;
+  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)');
+  let raf=0;
+  function update(){
+    raf=0;
+    const line=innerHeight*.6,all=reduce.matches;
+    stages.forEach((s,i)=>{
+      const r=s.getBoundingClientRect();if(!r.height)return;
+      s.classList.toggle('on',all||r.top+20<=line);
+      const next=stages[i+1];if(!next)return;
+      const top=r.top+44,end=next.getBoundingClientRect().top;
+      s.style.setProperty('--fill',(all?1:Math.max(0,Math.min(1,(line-top)/(end-top)))).toFixed(3));
+    });
+  }
+  const req=()=>{if(!raf)raf=requestAnimationFrame(update)};
+  addEventListener('scroll',req,{passive:true});addEventListener('resize',req);
+  if(window.ResizeObserver)new ResizeObserver(req).observe(document.querySelector('.stages'));
+  if(reduce.addEventListener)reduce.addEventListener('change',req);
+  req();
+})();
 // ── The prosthetic section's EEG trace. The calm line is the same on every visit (seeded noise). With a mouse,
 //    moving across the section makes the signal spike under the pointer; it settles a second or two after the
 //    pointer stops. Nothing moves with reduced motion or the animations paused. ──
@@ -1181,12 +1327,16 @@ fetch('sponsorship-packet.pdf',{method:'HEAD'}).then(r=>{if(!r.ok)throw 0}).catc
 import { createAsciiArt } from './portal/js/art/engine.js';
 import BULL from './portal/js/art/bull-map.js';
 import CRUSH from './portal/js/art/crush-map.js';
+import GEAR from './portal/js/art/gear-map.js';
 const scenes = {
   pair: { key: 'home', layout: 'pair', logos: [
     { map: BULL, effect: 'steam', name: 'Engineering Renaissance', note: 'the club' },
     { map: CRUSH, effect: 'ripple', name: 'Crush Depth', note: 'our MATE ROV team' },
   ] },
   crush: { key: 'crush', layout: 'solo', flow: 'up', logos: [{ map: CRUSH, effect: 'ripple' }] },
+  'team-exec': { key: 'team-exec', layout: 'solo', logos: [{ map: BULL, effect: 'steam' }] },
+  'team-admin': { key: 'team-admin', layout: 'solo', flow: 'up', logos: [{ map: CRUSH, effect: 'ripple' }] },
+  'team-advisors': { key: 'team-advisors', layout: 'solo', logos: [{ map: GEAR, effect: 'ripple' }] },
 };
 if (window.ResizeObserver && window.IntersectionObserver) {
   const arts = [...document.querySelectorAll('[data-ascii]')].map((box) => createAsciiArt(box, box.querySelector('canvas'), scenes[box.dataset.ascii]));
