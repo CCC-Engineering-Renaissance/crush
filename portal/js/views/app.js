@@ -7,13 +7,31 @@ import { Portal } from './shell.js';
 import { InstallSheet } from './install.js';
 import { TourHost } from './tour.js';
 
-function demoRequested() {
-  try { return sessionStorage.getItem('er-demo') === '1' || new URLSearchParams(location.search).has('demo'); } catch { return false; }
+// The demo asks for an access code first. This is the SHA-256 of 'er-demo:' plus the code, so the
+// code isn't written out in the page source. It only keeps casual visitors out: the site is static,
+// so anyone who digs through the code can still get in. To change the code, run
+//   printf 'er-demo:NEWCODE' | shasum -a 256
+// and paste the result here.
+const DEMO_CODE_SHA256 = 'f9ec681812d4eb8ff563223cd58f6581aab3aad359af9b545f5cb72fa71da49e';
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// The right code unlocks the demo until the tab is closed.
+function demoUnlocked() {
+  try { return sessionStorage.getItem('er-demo') === DEMO_CODE_SHA256; } catch { return false; }
+}
+
+// A ?demo link opens straight to the code box.
+function demoLinked() {
+  try { return new URLSearchParams(location.search).has('demo'); } catch { return false; }
 }
 
 export function App({ config }) {
   const configured = !!config?.firebase?.apiKey;
-  const [mode, setMode] = useState(configured ? 'firebase' : demoRequested() ? 'demo' : null);
+  const [mode, setMode] = useState(configured ? 'firebase' : demoUnlocked() ? 'demo' : null);
   const [bootError, setBootError] = useState(null);
   const { api, authUser, profile } = useStore((s) => ({ api: s.api, authUser: s.authUser, profile: s.profile }));
 
@@ -60,7 +78,7 @@ export function App({ config }) {
       <div class="gate-actions"><button class="btn btn-primary btn-lg" onClick=${() => location.reload()}>Reload the page</button></div>
     </${Gate}>`;
   }
-  else if (!mode) screen = html`<${SetupNotice} onDemo=${() => { try { sessionStorage.setItem('er-demo', '1'); } catch { /* ignore */ } setMode('demo'); }} />`;
+  else if (!mode) screen = html`<${SetupNotice} ask=${demoLinked()} onDemo=${() => { try { sessionStorage.setItem('er-demo', DEMO_CODE_SHA256); } catch { /* ignore */ } setMode('demo'); }} />`;
   else if (!api || authUser === undefined) screen = html`<${Boot} />`;
   else if (!authUser) screen = html`<${SignIn} />`;
   else if (profile === undefined) screen = html`<${Boot} />`;
@@ -130,14 +148,47 @@ function ShareLink() {
   </div>`;
 }
 
-function SetupNotice({ onDemo }) {
+function SetupNotice({ ask, onDemo }) {
+  const [asking, setAsking] = useState(!!ask);
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { if (asking) inputRef.current?.focus(); }, [asking]);
+  const submit = async (e) => {
+    e.preventDefault();
+    const entered = code.trim();
+    if (!entered) { setError('Enter the demo access code.'); inputRef.current?.focus(); return; }
+    setBusy(true); setError('');
+    let hash = '';
+    try { hash = await sha256Hex('er-demo:' + entered); } catch { /* crypto.subtle only exists on https */ }
+    setBusy(false);
+    if (hash === DEMO_CODE_SHA256) { onDemo(); return; }
+    setError(hash ? 'That code isn’t right. Check it and try again.' : 'The demo only opens over a secure connection. Use the https:// address.');
+    inputRef.current?.select();
+  };
+  const cancel = () => { setAsking(false); setCode(''); setError(''); };
   return html`<${Gate} title="The portal opens soon."
-    lede="Officers are connecting it to the club’s Google account. Until then, you can try every screen with sample data. Nothing you do in the demo leaves this browser.">
-    <div class="gate-actions">
-      <button class="btn btn-primary btn-lg" onClick=${onDemo}>Try the demo</button>
-      <${EmailOfficers} />
-    </div>
-    <p class="gate-note">Officers: SETUP.md in the website’s repository walks through connecting it. It takes about 30 minutes, once.</p>
+    lede="Lab hours, the team’s docs, tasks, the calendar and announcements: everything the club runs on, in one place. Until it opens, you can try every screen with sample data. Nothing you do in the demo leaves this browser.">
+    ${asking ? html`
+      <form class="gate-form gate-code" onSubmit=${submit} noValidate>
+        <label class="field" for="demo-code"><span>Demo access code</span>
+          <input id="demo-code" ref=${inputRef} class="input" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" maxlength="20"
+            value=${code} onInput=${(e) => { setCode(e.target.value); if (error) setError(''); }}
+            aria-invalid=${error ? 'true' : 'false'} aria-describedby=${error ? 'demo-code-error' : undefined} />
+        </label>
+        ${error && html`<p class="form-error" id="demo-code-error" role="alert">${error}</p>`}
+        <div class="gate-actions">
+          <button class="btn btn-primary btn-lg" type="submit" disabled=${busy}>Open the demo</button>
+          <button class="btn btn-lg" type="button" onClick=${cancel}>Cancel</button>
+        </div>
+      </form>
+      <p class="gate-note">No code? <a href=${'mailto:' + contactEmail()}>Email the officers</a> for one.</p>`
+    : html`
+      <div class="gate-actions">
+        <button class="btn btn-primary btn-lg" onClick=${() => setAsking(true)}>Try the demo</button>
+        <${EmailOfficers} />
+      </div>`}
   </${Gate}>`;
 }
 

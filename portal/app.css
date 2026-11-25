@@ -830,6 +830,10 @@ p { text-wrap: pretty; }
 .gate-note { margin: 12px 0 0; max-width: 36em; font-size: 14px; color: var(--g-muted); }
 .gate-form { margin-top: 28px; }
 .gate-form .gate-actions { margin-top: 4px; }
+.gate-code .field { max-width: 17rem; }
+.gate-code .input { min-height: 48px; font-family: var(--font-mono); font-size: 20px; letter-spacing: .18em; }
+.gate-code .gate-actions { margin-top: 18px; }
+.gate-note a { color: var(--g-ink); }
 .gate-foot { padding: 0 clamp(20px, 4vw, 48px) 24px; font-size: 13px; color: var(--g-muted); }
 .gate-foot a { color: var(--g-ink); overflow-wrap: anywhere; }
 .gate-art { position: relative; align-self: stretch; min-height: 440px; max-height: 720px; }
@@ -858,6 +862,7 @@ p { text-wrap: pretty; }
 @media (max-width: 560px) {
   .gate-top { padding-top: 16px; }
   .gate-actions .btn { flex: 1 1 100%; }
+  .gate-code .field { max-width: none; }
   .gate-share { width: 100%; flex-direction: column; }
   .gate-share code { padding: 12px 14px; font-size: 13px; text-align: center; }
   .gate-share button { min-height: 44px; border-left: 0; border-top: 1px solid var(--g-line); }
