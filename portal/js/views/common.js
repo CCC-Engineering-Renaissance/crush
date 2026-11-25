@@ -34,13 +34,15 @@ export function Contours({ cx = 820, cy = 120, rings = 11, step = 62, labels = f
 
 export function DemoBar() {
   const api = useStore((s) => s.api);
-  const [persona, setPersona] = useState(api?.persona);
+  // The menu always shows the backend's persona. This bar can mount before the demo backend
+  // exists, so a copy kept in state would show the first option instead of who you really are.
+  const [, rerender] = useState(0);
   if (!api || api.mode !== 'demo') return null;
   return html`<aside class="demo-bar" aria-label="Demo mode">
     <strong>Demo mode.</strong>
     <span class="why">Sample data, saved only in this browser. Nothing here is real.</span>
     <label class="row" style="gap:6px">View as
-      <select value=${persona} onChange=${(e) => { setPersona(e.target.value); api.setPersona(e.target.value); }}>
+      <select value=${api.persona} onChange=${(e) => { api.setPersona(e.target.value); rerender((n) => n + 1); }}>
         ${api.personas.map((p) => html`<option value=${p.key} key=${p.key}>${p.label}</option>`)}
       </select>
     </label>

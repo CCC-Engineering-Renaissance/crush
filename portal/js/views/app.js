@@ -78,7 +78,14 @@ export function App({ config }) {
       <div class="gate-actions"><button class="btn btn-primary btn-lg" onClick=${() => location.reload()}>Reload the page</button></div>
     </${Gate}>`;
   }
-  else if (!mode) screen = html`<${SetupNotice} ask=${demoLinked()} onDemo=${() => { try { sessionStorage.setItem('er-demo', DEMO_CODE_SHA256); } catch { /* ignore */ } setMode('demo'); }} />`;
+  else if (!mode) screen = html`<${SetupNotice} ask=${demoLinked()} onDemo=${() => {
+    try {
+      sessionStorage.setItem('er-demo', DEMO_CODE_SHA256);
+      // Each new demo visit starts as Admin, whoever the visitor picked under "View as" last time.
+      localStorage.removeItem('er-portal-demo-persona');
+    } catch { /* storage blocked: the demo still opens */ }
+    setMode('demo');
+  }} />`;
   else if (!api || authUser === undefined) screen = html`<${Boot} />`;
   else if (!authUser) screen = html`<${SignIn} />`;
   else if (profile === undefined) screen = html`<${Boot} />`;
