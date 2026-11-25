@@ -1,30 +1,37 @@
 // Spaces and pages: a Notion-style tree of pages per space, each space with a Drive folder and a task board.
-import { html, useState, useEffect, useRef, useMemo, Icon, Modal, openModal, Field, Menu, Loading, Empty, Notice, toast, toastError, confirmDialog, EmojiPicker, ItemIcon } from '../lib/ui.js';
-import { useStore, isLead, isAdmin, getState } from '../lib/store.js';
+import { html, useState, useEffect, useRef, useMemo, Icon, Avatar, Modal, openModal, Field, Menu, Loading, Empty, Notice, useAsync, toast, toastError, confirmDialog, EmojiPicker, ItemIcon } from '../lib/ui.js';
+import { useStore, setState, isLead, isAdmin, getState, bump, canSeeSpace, visibleSpaces, groupBySubsidiary, subsidiaryById, subteamById, subteamLabel, treeOf } from '../lib/store.js';
 import { useRoute, href, go } from '../lib/router.js';
 import { relTime, fmtDateTime } from '../lib/time.js';
 import { nest, pathTo, descendants } from '../data/tree.js';
 import { BlocksView, EditorHost, DriveBlock, toggleChecklist } from './editor.js';
 import { driveConfigured, pickFromDrive, parseDriveLink } from '../google/drive.js';
-import { seriesColor, PALETTE_KEYS } from './charts.js';
-import { useTitle } from './common.js';
+import { useTitle, SpaceIcon } from './common.js';
 
-const canEditSpace = (space, profile) => isLead(profile) || !!space?.memberEdit;
+const canEditSpace = (space, profile) => canSeeSpace(space, profile) && (isLead(profile) || !!space?.memberEdit);
+const useTree = (spaceId) => useStore((s) => treeOf(spaceId, s));
+const pageCount = (n) => (n === 1 ? '1 page' : `${n} pages`);
 
 // ───────── All spaces ─────────
 export function SpacesIndex() {
   useTitle('Spaces');
-  const { spaces, profile } = useStore((s) => ({ spaces: s.spaces, profile: s.profile }));
+  const { profile, subsidiaries, contents } = useStore((s) => ({ profile: s.profile, subsidiaries: s.subsidiaries, contents: s.contents }));
+  const spaces = useStore((s) => visibleSpaces(s));
+  const groups = groupBySubsidiary(spaces, subsidiaries).filter((g) => g.items.length);
+  const row = (s) => html`<li key=${s.id} style="align-items:center">
+    <span class="space-glyph"><${SpaceIcon} space=${s} size=${22} /></span>
+    <span class="grow"><a class="title" href=${href('/s/' + s.id)}>${s.name}</a>${s.private && html`<span class="badge" style="margin-left:8px"><${Icon} name="lock" size=${12} />Private</span>`}
+      <div class="meta">${s.description || ''}</div></span>
+    <span class="small muted nowrap">${pageCount((contents[s.id]?.tree || []).length)}</span>
+    <a class="btn btn-sm" href=${href(`/s/${s.id}/board`)}><${Icon} name="board" />Board</a>
+  </li>`;
   return html`<div class="content">
-    <div class="page-head"><div><h1>Spaces</h1><p>Each space holds pages, a task board and a Google Drive folder.</p></div>
-      ${isAdmin(profile) && html`<div class="actions"><a class="btn" href="#/admin/spaces"><${Icon} name="plus" />Add a space</a></div>`}</div>
-    ${!spaces.length ? html`<div class="panel"><${Empty} title="No spaces yet">${isAdmin(profile) ? 'Create spaces in Admin, or add the starter set.' : 'An admin sets these up.'}</${Empty}></div>`
-    : html`<div class="panel"><ul class="list list-flush">${spaces.map((s) => html`<li key=${s.id} style="align-items:center">
-        <span style="width:36px;text-align:center"><${ItemIcon} icon=${s.icon} kind="space" size=${26} /></span>
-        <span class="grow"><a class="title" href=${href('/s/' + s.id)}>${s.name}</a><div class="meta">${s.description || ''}</div></span>
-        <span class="small muted nowrap">${(s.tree || []).length} pages</span>
-        <a class="btn btn-sm" href=${href(`/s/${s.id}/board`)}><${Icon} name="board" />Board</a>
-      </li>`)}</ul></div>`}
+    <div class="page-head"><div><h1>Spaces</h1><p>Each space holds pages, a task board and a Google Drive folder. They’re grouped by subsidiary, like channels in Discord.</p></div>
+      ${isAdmin(profile) && html`<div class="actions"><button class="btn" onClick=${() => openNewSpace({})}><${Icon} name="plus" />New space</button></div>`}</div>
+    ${!groups.length ? html`<div class="panel"><${Empty} title="No spaces yet">${isAdmin(profile) ? 'Create spaces in Admin, or add the starter set.' : 'An admin sets these up, or hasn’t added you to any yet.'}</${Empty}></div>`
+    : groups.map((g) => html`<section key=${g.sub?.id || '-'} style="margin-bottom:20px">
+        ${(g.sub || groups.length > 1) && html`<h2 class="section-title" style="margin-top:0">${g.sub ? g.sub.name : 'Club-wide'}</h2>`}
+        <div class="panel"><ul class="list list-flush">${g.items.map(row)}</ul></div></section>`)}
   </div>`;
 }
 
@@ -32,34 +39,46 @@ export function SpacesIndex() {
 export function SpaceHome({ spaceId }) {
   const { profile } = useStore((s) => ({ profile: s.profile }));
   const space = useStore((s) => s.spaces.find((x) => x.id === spaceId));
+  const content = useStore((s) => s.contents[spaceId]);
   useTitle(space?.name || 'Space');
   if (!space) return html`<div class="content"><${Empty} title="This space doesn’t exist">It may have been deleted.</${Empty}></div>`;
+  if (!canSeeSpace(space, profile)) return html`<div class="content"><${NoAccess} space=${space} /></div>`;
   const editable = canEditSpace(space, profile);
-  const tree = nest(space.tree || []);
+  const treeList = content?.tree || [];
+  const tree = nest(treeList);
+  const folder = content?.driveFolder;
+  const sub = subsidiaryById(space.subsidiaryId);
   return html`<div class="content">
+    ${sub && html`<div class="crumbs"><span>${sub.name}</span><${Icon} name="chevronRight" /><span>${space.name}</span></div>`}
     <div class="page-head">
-      <div class="row" style="gap:14px;align-items:center"><${ItemIcon} icon=${space.icon} kind="space" size=${44} />
+      <div class="row" style="gap:12px;align-items:center"><span class="space-glyph lg"><${SpaceIcon} space=${space} size=${30} /></span>
         <div><h1>${space.name}</h1>${space.description && html`<p>${space.description}</p>`}</div></div>
       <div class="actions">
         ${editable && html`<button class="btn btn-primary" onClick=${() => openNewPage(space, null)}><${Icon} name="plus" />New page</button>`}
         <a class="btn" href=${href(`/s/${space.id}/board`)}><${Icon} name="board" />Task board</a>
+        ${isAdmin(profile) && html`<button class="btn" onClick=${() => openSpaceAccess(space)}><${Icon} name="users" />Who can open it</button>`}
         ${isLead(profile) && html`<button class="btn btn-icon" aria-label="Space settings" title="Space settings" onClick=${() => openSpaceSettings(space)}><${Icon} name="sliders" /></button>`}
       </div>
     </div>
-    ${!editable && html`<p class="small muted" style="margin-top:-12px">Leads edit the pages in this space.</p>`}
+    ${space.private && html`<p class="small muted row" style="margin-top:-12px;gap:6px"><${Icon} name="lock" size=${15} />Private: only people an admin adds can open this space.</p>`}
+    ${!editable && html`<p class="small muted" style="margin-top:${space.private ? '-6px' : '-12px'}">Leads edit the pages in this space.</p>`}
     <div class="grid-2" style="align-items:start">
       <section class="panel">
-        <div class="panel-head"><h2>Pages</h2><span class="small muted">${(space.tree || []).length}</span></div>
-        <div class="panel-body">${tree.length ? html`<${PageTree} nodes=${tree} depth=${0} />` : html`<p class="muted" style="margin:6px 0">${editable ? 'No pages yet. Start with meeting notes or a how-to.' : 'No pages yet.'}</p>`}</div>
+        <div class="panel-head"><h2>Pages</h2><span class="small muted">${treeList.length}</span></div>
+        <div class="panel-body">${!content ? html`<${Loading} />` : tree.length ? html`<${PageTree} nodes=${tree} depth=${0} />` : html`<p class="muted" style="margin:6px 0">${editable ? 'No pages yet. Start with meeting notes or a how-to.' : 'No pages yet.'}</p>`}</div>
       </section>
       <section class="panel">
-        <div class="panel-head"><h2>Google Drive folder</h2>${isLead(profile) && html`<button class="link-btn small" onClick=${() => openSpaceSettings(space)}>${space.driveFolder ? 'Change' : 'Link a folder'}</button>`}</div>
-        <div class="panel-body">${space.driveFolder
-          ? html`<${DriveBlock} file=${{ ...space.driveFolder, mimeType: 'application/vnd.google-apps.folder', demo: space.driveFolder.id?.startsWith('demo-') }} folder />`
+        <div class="panel-head"><h2>Google Drive folder</h2>${isLead(profile) && html`<button class="link-btn small" onClick=${() => openSpaceSettings(space)}>${folder ? 'Change' : 'Link a folder'}</button>`}</div>
+        <div class="panel-body">${folder
+          ? html`<${DriveBlock} file=${{ ...folder, mimeType: 'application/vnd.google-apps.folder', demo: folder.id?.startsWith('demo-') }} folder />`
           : html`<p class="muted" style="margin:6px 0">${isLead(profile) ? 'Link the shared Drive folder this team keeps its files in.' : 'No folder linked yet.'}</p>`}</div>
       </section>
     </div>
   </div>`;
+}
+
+export function NoAccess({ space }) {
+  return html`<${Empty} title=${`You can’t open #${space.name}`}>It’s a private space. Ask an admin to add you.</${Empty}>`;
 }
 
 function PageTree({ nodes, depth }) {
@@ -80,7 +99,8 @@ export function PageView({ pageId }) {
   useTitle(page?.title || 'Page');
 
   if (page === undefined) return html`<div class="content doc"><${Loading} /></div>`;
-  if (page === null) return html`<div class="content doc"><${Empty} title="This page doesn’t exist">It may have been deleted or moved.</${Empty}></div>`;
+  if (page === null) return html`<div class="content doc"><${Empty} title="This page doesn’t exist">It may have been deleted or moved, or it’s in a private space you haven’t been added to.</${Empty}></div>`;
+  if (space && !canSeeSpace(space, profile)) return html`<div class="content doc"><${NoAccess} space=${space} /></div>`;
   const editable = canEditSpace(space, profile);
   return editing && editable
     ? html`<${PageEditor} key=${page.id + ':edit'} page=${page} space=${space} onDone=${() => { setEditing(false); go('/p/' + page.id, { replace: true }); }} />`
@@ -88,15 +108,19 @@ export function PageView({ pageId }) {
 }
 
 function Breadcrumbs({ page, space }) {
-  const trail = space ? pathTo(space.tree || [], page.id).slice(0, -1) : [];
+  const tree = useTree(space?.id);
+  const trail = space ? pathTo(tree, page.id).slice(0, -1) : [];
+  const sub = subsidiaryById(space?.subsidiaryId);
   return html`<div class="crumbs">
-    ${space && html`<a href=${href('/s/' + space.id)}>${space.icon} ${space.name}</a>`}
+    ${sub && html`<span>${sub.name}</span><${Icon} name="chevronRight" />`}
+    ${space && html`<a href=${href('/s/' + space.id)} class="row" style="gap:4px"><${SpaceIcon} space=${space} size=${15} />${space.name}</a>`}
     ${trail.map((n) => html`<${Icon} name="chevronRight" key=${'i' + n.id} /><a key=${n.id} href=${href('/p/' + n.id)}>${n.title}</a>`)}
   </div>`;
 }
 
 function SubPages({ page, space, editable }) {
-  const kids = (space?.tree || []).filter((n) => n.parentId === page.id).sort((a, b) => (a.order || 0) - (b.order || 0));
+  const tree = useTree(space?.id);
+  const kids = tree.filter((n) => n.parentId === page.id).sort((a, b) => (a.order || 0) - (b.order || 0));
   if (!kids.length && !editable) return null;
   return html`<div class="page-children">
     <div class="row" style="justify-content:space-between;margin-bottom:6px"><b class="small">Pages inside</b>
@@ -108,6 +132,7 @@ function SubPages({ page, space, editable }) {
 
 function PageReader({ page, space, editable, onEdit }) {
   const { api, profile } = useStore((s) => ({ api: s.api, profile: s.profile }));
+  const tree = useTree(space?.id);
   const [busy, setBusy] = useState(false);
   const toggle = async (path) => {
     if (busy) return;
@@ -121,7 +146,7 @@ function PageReader({ page, space, editable, onEdit }) {
     try { await navigator.clipboard.writeText(url); toast('Link copied.'); } catch { toast(url); }
   };
   const remove = async () => {
-    const count = descendants(space?.tree || [], page.id).length - 1;
+    const count = descendants(tree, page.id).length - 1;
     if (!(await confirmDialog({ title: 'Delete this page?', body: `“${page.title}”${count ? ` and the ${count} page${count === 1 ? '' : 's'} inside it` : ''} will be deleted for everyone. This can’t be undone.`, confirmLabel: 'Delete page', danger: true }))) return;
     try {
       await api.deletePage(page);
@@ -130,7 +155,7 @@ function PageReader({ page, space, editable, onEdit }) {
       go('/s/' + page.spaceId);
     } catch (e) { toastError(e, 'Only leads and the page’s creator can delete it.'); }
   };
-  const canDelete = isLead(profile) || (editable && page.createdBy === profile.uid && descendants(space?.tree || [], page.id).length === 1);
+  const canDelete = isLead(profile) || (editable && page.createdBy === profile.uid && descendants(tree, page.id).length === 1);
   const empty = !page.content?.blocks?.length;
   return html`<div class="content doc">
     <${Breadcrumbs} page=${page} space=${space} />
@@ -225,7 +250,7 @@ function NewPage({ space, parentId, close }) {
   const [title, setTitle] = useState('');
   const [icon, setIcon] = useState('');
   const [busy, setBusy] = useState(false);
-  const parent = (space.tree || []).find((n) => n.id === parentId);
+  const parent = treeOf(space.id).find((n) => n.id === parentId);
   const create = async () => {
     if (!title.trim()) return;
     setBusy(true);
@@ -237,7 +262,7 @@ function NewPage({ space, parentId, close }) {
   };
   return html`<${Modal} title="New page" onClose=${close}
     footer=${html`<button class="btn" onClick=${close}>Cancel</button><button class="btn btn-primary" onClick=${create} disabled=${busy || !title.trim()}>Create page</button>`}>
-    <p class="small muted" style="margin-top:0">In ${space.icon ? space.icon + ' ' : ''}${space.name}${parent ? `, inside “${parent.title}”` : ''}.</p>
+    <p class="small muted" style="margin-top:0">In #${space.name}${parent ? `, inside “${parent.title}”` : ''}.</p>
     <div class="row" style="align-items:flex-end">
       <button class="btn btn-icon" style="font-size:20px" aria-label="Choose icon" onClick=${() => openModal((c) => html`<${EmojiPicker} onClose=${c} onPick=${setIcon} />`)}>${icon || html`<${Icon} name="page" />`}</button>
       <${Field} label="Title"><input class="input" value=${title} maxlength="200" placeholder="Meeting notes, How to wire a thruster…" onInput=${(e) => setTitle(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && create()} /></${Field}>
@@ -248,8 +273,9 @@ function NewPage({ space, parentId, close }) {
 function openMovePage(page, space) { openModal((close) => html`<${MovePage} page=${page} space=${space} close=${close} />`); }
 function MovePage({ page, space, close }) {
   const { api, profile } = useStore((s) => ({ api: s.api, profile: s.profile }));
-  const blocked = new Set(descendants(space.tree || [], page.id));
-  const options = (space.tree || []).filter((n) => !blocked.has(n.id));
+  const tree = treeOf(space.id);
+  const blocked = new Set(descendants(tree, page.id));
+  const options = tree.filter((n) => !blocked.has(n.id));
   const [parentId, setParentId] = useState(page.parentId || '');
   const save = async () => {
     try { await api.updatePageMeta(page, { parentId: parentId || null }, profile); toast('Page moved.'); close(); } catch (e) { toastError(e); }
@@ -262,10 +288,20 @@ function MovePage({ page, space, close }) {
 }
 
 export function openSpaceSettings(space) { openModal((close) => html`<${SpaceSettings} space=${space} close=${close} />`); }
-export function SpaceSettings({ space, close }) {
-  const { api, profile } = useStore((s) => ({ api: s.api, profile: s.profile }));
+export function openNewSpace(preset = {}) { openModal((close) => html`<${SpaceSettings} space=${null} preset=${preset} close=${close} />`); }
+
+// Leads edit a space's name, description, editing and Drive folder. Admins also choose its
+// subsidiary, its subteam and whether it's private.
+export function SpaceSettings({ space, preset = {}, close }) {
+  const { api, profile, subsidiaries, subteams } = useStore((s) => ({ api: s.api, profile: s.profile, subsidiaries: s.subsidiaries, subteams: s.subteams }));
+  const content = useStore((s) => (space ? s.contents[space.id] : null));
+  const admin = isAdmin(profile);
   const isNew = !space;
-  const [f, setF] = useState({ name: space?.name || '', icon: space?.icon || '📁', color: space?.color || 'sky', description: space?.description || '', memberEdit: space ? !!space.memberEdit : true, driveFolder: space?.driveFolder || null });
+  const [f, setF] = useState({
+    name: space?.name || '', description: space?.description || '', memberEdit: space ? !!space.memberEdit : true,
+    subsidiaryId: space ? (space.subsidiaryId || '') : (preset.subsidiaryId || ''), subteamId: space?.subteamId || '',
+    private: space ? !!space.private : false, driveFolder: content?.driveFolder || null,
+  });
   const [link, setLink] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -275,28 +311,42 @@ export function SpaceSettings({ space, close }) {
     if (!file || file.mimeType !== 'application/vnd.google-apps.folder') { setErr('Paste a link to a Google Drive folder (it contains /folders/).'); return; }
     setF({ ...f, driveFolder: { id: file.id, name: 'Drive folder', url: file.url } }); setLink(''); setErr('');
   };
+  const teamChoices = subteams.filter((t) => (t.subsidiaryId || '') === f.subsidiaryId);
   const save = async () => {
-    if (!f.name.trim()) return setErr('Name the space.');
+    const name = f.name.trim();
+    if (!name) return setErr('Name the space.');
     setBusy(true);
     try {
-      const data = { name: f.name.trim(), icon: f.icon, color: f.color, description: f.description.trim(), memberEdit: f.memberEdit, driveFolder: f.driveFolder };
-      if (isNew) await api.saveRef('spaces', { ...data, order: getState().spaces.length + 1, tree: [] });
-      else await api.saveRef('spaces', { id: space.id, ...data });
-      api.log(profile, isNew ? 'space.add' : 'space.edit', `${isNew ? 'Created' : 'Updated'} space “${data.name}”`, { type: 'space', id: space?.id });
+      const meta = { name, description: f.description.trim(), memberEdit: f.memberEdit };
+      const grouping = { subsidiaryId: f.subsidiaryId || null, subteamId: f.subteamId || null, private: f.private };
+      let id = space?.id;
+      if (isNew) id = await api.createSpace({ ...meta, ...grouping, order: getState().spaces.length + 1 }, { driveFolder: f.driveFolder });
+      else {
+        await api.saveRef('spaces', { id, ...meta, ...(admin ? grouping : {}) });
+        if ((f.driveFolder?.id || null) !== (content?.driveFolder?.id || null)) await api.saveSpaceContent(id, { driveFolder: f.driveFolder });
+      }
+      api.log(profile, isNew ? 'space.add' : 'space.edit', `${isNew ? 'Created' : 'Updated'} space #${name}${f.private ? ' (private)' : ''}`, { type: 'space', id });
       toast(isNew ? 'Space created.' : 'Space saved.');
       close();
+      if (isNew && f.private) openSpaceAccess({ id, name, private: true, subteamId: f.subteamId || null });
     } catch (e) { toastError(e); setBusy(false); }
   };
-  return html`<${Modal} title=${isNew ? 'New space' : 'Space settings'} onClose=${close} wide
+  return html`<${Modal} title=${isNew ? 'New space' : `#${space.name} settings`} onClose=${close} wide
     footer=${html`<button class="btn" onClick=${close}>Cancel</button><button class="btn btn-primary" onClick=${save} disabled=${busy}>${isNew ? 'Create space' : 'Save'}</button>`}>
     <div class="form-grid">
-      <div class="field full"><span>Name and icon</span><div class="row">
-        <button class="btn btn-icon" style="font-size:20px" aria-label="Choose icon" onClick=${() => openModal((c) => html`<${EmojiPicker} onClose=${c} onPick=${(e) => setF({ ...f, icon: e })} />`)}>${f.icon || html`<${Icon} name="folder" />`}</button>
-        <input class="input" value=${f.name} maxlength="60" placeholder="Crush Depth" onInput=${(e) => setF({ ...f, name: e.target.value })} /></div></div>
+      <${Field} label="Name" hint="Short and lowercase reads best, like a Discord channel: chassis, controls-systems."><input class="input" value=${f.name} maxlength="60" placeholder="chassis" onInput=${(e) => setF({ ...f, name: e.target.value })} /></${Field}>
+      ${admin ? html`<${Field} label="Subsidiary"><select class="select" value=${f.subsidiaryId} onChange=${(e) => setF({ ...f, subsidiaryId: e.target.value, subteamId: '' })}>
+          <option value="">None (club-wide)</option>${subsidiaries.map((x) => html`<option value=${x.id} key=${x.id}>${x.name}</option>`)}</select></${Field}>`
+        : html`<div></div>`}
       <${Field} label="Description" full><input class="input" value=${f.description} maxlength="200" onInput=${(e) => setF({ ...f, description: e.target.value })} /></${Field}>
-      <div class="field full"><span>Color</span><div class="chips">${PALETTE_KEYS.map((k) => html`<button type="button" key=${k} class="chip chip-toggle" aria-pressed=${String(f.color === k)} onClick=${() => setF({ ...f, color: k })}><i style=${{ background: seriesColor(k) }}></i>${k[0].toUpperCase() + k.slice(1)}</button>`)}</div></div>
+      ${admin && html`<${Field} label="Subteam (optional)" hint="Its members are suggested when you add people to a private space.">
+        <select class="select" value=${f.subteamId} onChange=${(e) => setF({ ...f, subteamId: e.target.value })}>
+          <option value="">None</option>${teamChoices.map((t) => html`<option value=${t.id} key=${t.id}>${t.name}</option>`)}</select></${Field}>`}
+      ${admin && html`<div class="field" role="radiogroup" aria-label="Who can open it"><span aria-hidden="true">Who can open it</span>
+        <label class="check"><input type="radio" name="sp-private" checked=${!f.private} onChange=${() => setF({ ...f, private: false })} /><span>Every member</span></label>
+        <label class="check"><input type="radio" name="sp-private" checked=${f.private} onChange=${() => setF({ ...f, private: true })} /><span>Only people you add (private)</span></label></div>`}
       <label class="check full"><input type="checkbox" checked=${f.memberEdit} onChange=${(e) => setF({ ...f, memberEdit: e.target.checked })} />
-        <span>Every member can add and edit pages and tasks here<br /><span class="small muted">Turn off for spaces only leads should change, like officer docs.</span></span></label>
+        <span>Everyone who can open it can add and edit pages and tasks<br /><span class="small muted">Turn off for spaces only leads should change, like officer docs.</span></span></label>
       <div class="field full"><span>Google Drive folder</span>
         ${f.driveFolder ? html`<div class="row"><span class="chip"><${Icon} name="folder" size=${14} />${f.driveFolder.name || 'Drive folder'}</span><button class="link-btn small" onClick=${() => setF({ ...f, driveFolder: null })}>Remove</button></div>`
         : html`<div class="row wrap">${driveConfigured() && html`<button class="btn btn-sm" type="button" onClick=${pickFolder}><${Icon} name="cloud" />Choose from Google Drive</button>`}
@@ -305,5 +355,60 @@ export function SpaceSettings({ space, close }) {
         <small>Members see the folder’s files right in the space. Share the folder with the club in Google Drive so everyone can open it.</small></div>
     </div>
     ${err && html`<p class="form-error" role="alert">${err}</p>`}
+  </${Modal}>`;
+}
+
+// ───────── Who can open a space (admins) ─────────
+export function openSpaceAccess(space) { openModal((close) => html`<${SpaceAccess} space=${space} close=${close} />`); }
+function SpaceAccess({ space, close }) {
+  const { api, profile, subteams } = useStore((s) => ({ api: s.api, profile: s.profile, subteams: s.subteams }));
+  const live = useStore((s) => s.spaces.find((x) => x.id === space.id)) || space;
+  const res = useAsync(() => api.listMembers(), [api]);
+  const people = (res.data || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const [isPrivate, setPrivate] = useState(!!live.private);
+  const [chosen, setChosen] = useState(null); // Set of uids, once members load
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (res.data && !chosen) setChosen(new Set(res.data.filter((m) => (m.spaces || []).includes(space.id)).map((m) => m.uid))); }, [res.data]);
+  const team = subteamById(live.subteamId);
+  const addTeam = (teamId) => setChosen(new Set([...chosen, ...people.filter((m) => (m.subteams || []).includes(teamId)).map((m) => m.uid)]));
+  const flip = (uid) => { const next = new Set(chosen); next.has(uid) ? next.delete(uid) : next.add(uid); setChosen(next); };
+  const shown = people.filter((m) => !q || `${m.name} ${m.email}`.toLowerCase().includes(q.toLowerCase()));
+  const save = async () => {
+    setBusy(true);
+    try {
+      const changes = {};
+      for (const m of people) {
+        const has = (m.spaces || []).includes(space.id), want = chosen.has(m.uid);
+        if (has !== want) changes[m.uid] = want ? [...(m.spaces || []), space.id] : (m.spaces || []).filter((x) => x !== space.id);
+      }
+      if (Object.keys(changes).length) await api.setSpaceAccess(changes);
+      if (isPrivate !== !!live.private) await api.saveRef('spaces', { id: space.id, private: isPrivate });
+      const n = Object.keys(changes).length;
+      api.log(profile, 'space.access', `#${live.name}: ${isPrivate ? 'private' : 'open to every member'}${n ? `, changed access for ${n} ${n === 1 ? 'person' : 'people'}` : ''}`, { type: 'space', id: space.id });
+      setState({ membersCache: null }); bump();
+      toast('Access saved.');
+      close();
+    } catch (e) { toastError(e); setBusy(false); }
+  };
+  return html`<${Modal} title=${`Who can open #${live.name}`} onClose=${close} wide
+    footer=${html`<button class="btn" onClick=${close}>Cancel</button><button class="btn btn-primary" onClick=${save} disabled=${busy || !chosen}>Save</button>`}>
+    <div class="stack">
+      <div class="field" role="radiogroup" aria-label="Access"><span aria-hidden="true">Access</span>
+        <label class="check"><input type="radio" name="acc" checked=${!isPrivate} onChange=${() => setPrivate(false)} /><span>Every member</span></label>
+        <label class="check"><input type="radio" name="acc" checked=${isPrivate} onChange=${() => setPrivate(true)} /><span>Only the people checked below (private)<br /><span class="small muted">Admins can always open it.</span></span></label></div>
+      ${isPrivate && (!chosen ? html`<${Loading} />` : html`<div class="stack" style="gap:10px">
+        <div class="row wrap" style="gap:8px">
+          <div class="search" style="flex:1;min-width:200px"><${Icon} name="search" /><input class="input" type="search" placeholder="Find a member" value=${q} onInput=${(e) => setQ(e.target.value)} /></div>
+          ${team && html`<button class="btn btn-sm" type="button" onClick=${() => addTeam(team.id)}><${Icon} name="plus" />Add everyone in ${subteamLabel(team)}</button>`}
+          <select class="select" style="width:auto" aria-label="Add a whole subteam" value="" onChange=${(e) => e.target.value && addTeam(e.target.value)}>
+            <option value="">Add a subteam…</option>${subteams.map((t) => html`<option value=${t.id} key=${t.id}>${subteamLabel(t)}</option>`)}</select>
+        </div>
+        <p class="small muted" style="margin:0">${chosen.size} ${chosen.size === 1 ? 'person' : 'people'} added.</p>
+        <ul class="list list-flush pick-list">${shown.map((m) => html`<li key=${m.uid}>
+          <label class="check" style="flex:1"><input type="checkbox" checked=${m.role === 'admin' || chosen.has(m.uid)} disabled=${m.role === 'admin'} onChange=${() => flip(m.uid)} />
+            <${Avatar} person=${m} size=${26} /><span><b>${m.name}</b> <span class="small muted">${m.role === 'admin' ? 'Admin: can always open it' : (m.subteams || []).map(subteamLabel).filter(Boolean).join(', ')}</span></span></label></li>`)}</ul>
+      </div>`)}
+    </div>
   </${Modal}>`;
 }

@@ -8,9 +8,18 @@ rules_version = '2';
 // Roles live on users/{uid}:
 //   status: 'pending' | 'active' | 'inactive' | 'denied'
 //   role:   'member' | 'lead' | 'admin'
+//   spaces: ids of the private spaces an admin let them into
 // Only active users can see anything beyond their own profile.
 // Leads (officers, subteam leads) review hours, run reports, post announcements and events.
-// Admins also manage members, roles, subteams, spaces and settings.
+// Admins also manage members, roles, subsidiaries, subteams, spaces and settings.
+//
+// Private spaces: spaces/{id}.private == true. Only admins and the people listed in their
+// users/{uid}.spaces can read the space's outline (spaceContent/{id}), pages and tasks.
+// Everything access-controlled is keyed by the space id in its path or document, so every read
+// here can be checked without trusting the website.
+//
+// The Discord bot writes announcements with the club Google account's own access (IAM), which
+// these rules don't apply to. See discord-bot/ and SETUP.md.
 //
 // Bootstrap: create invites/{your-email-lowercase} with role 'admin' in the Firebase console,
 // then sign in to the portal. See SETUP.md.
@@ -57,7 +66,7 @@ service cloud.firestore {
       return str(d.name, 1, 80)
         && optStr(d, 'pronouns', 30) && optStr(d, 'major', 80) && optStr(d, 'bio', 1000)
         && optStr(d, 'joinNote', 1000) && optStr(d, 'photoURL', 2000)
-        && optList(d, 'skills', 25) && optList(d, 'subteams', 10)
+        && optList(d, 'skills', 25) && optList(d, 'subteams', 10) && optList(d, 'spaces', 300)
         && (!('links' in d) || (d.links is map && d.links.keys().hasOnly(['linkedin', 'github', 'website'])
             && httpsLink(d.links, 'linkedin') && httpsLink(d.links, 'github') && httpsLink(d.links, 'website')));
     }
@@ -114,6 +123,11 @@ service cloud.firestore {
     // ───────────── settings & reference data ─────────────
     match /config/{docId} {
       allow read: if active();
+      allow write: if admin();
+    }
+    // Subsidiaries (Crush Depth, Prosthetic…) group subteams and spaces.
+    match /subsidiaries/{id} {
+      allow read: if signedIn();   // names only; the join form groups subteams by them
       allow write: if admin();
     }
     match /subteams/{id} {
@@ -252,19 +266,70 @@ service cloud.firestore {
       allow delete: if lead();
     }
 
-    // Spaces hold pages and a task board. space.tree is the page outline shown in the sidebar.
+    // ───────── spaces ─────────
+    // spaces/{id}: name, grouping and who can open it (every active member can read these, so
+    //   the sidebar can list them; private ones are hidden in the website).
+    // spaceContent/{id}: the page outline and Drive folder. Pages: pages/{id} with spaceId.
+    // Tasks: spaces/{id}/tasks/{taskId}.
     function spaceData(s) { return get(spaceDoc(s)).data; }
-    function canEditSpace(s) { return lead() || (active() && spaceData(s).get('memberEdit', false) == true); }
+    function canSeeSpace(s) {
+      return active() && exists(spaceDoc(s)) && (
+        admin()
+        || spaceData(s).get('private', false) != true
+        || s in me().get('spaces', [])
+      );
+    }
+    function canEditSpace(s) {
+      return canSeeSpace(s) && (lead() || spaceData(s).get('memberEdit', false) == true);
+    }
+    function validContent(d) {
+      return d.keys().hasOnly(['tree', 'driveFolder', 'updatedAt'])
+        && (!('tree' in d) || (d.tree is list && d.tree.size() <= 1000));
+    }
+
+    function validTask(d) {
+      return str(d.title, 1, 200) && optStr(d, 'description', 4000)
+        && d.status in ['todo', 'doing', 'blocked', 'done']
+        && d.assignees is list && d.assignees.size() <= 12
+        && d.priority in ['low', 'normal', 'high']
+        && (d.due == null || str(d.due, 10, 10));
+    }
 
     match /spaces/{spaceId} {
       allow read: if active();
       allow create, delete: if admin();
-      allow update: if lead()
-        || (active() && existing().get('memberEdit', false) == true && onlyChanged(['tree', 'updatedAt']));
+      // Leads rename and describe spaces they can open. Only admins change who can open them.
+      allow update: if admin()
+        || (lead() && canSeeSpace(spaceId)
+            && onlyChanged(['name', 'icon', 'color', 'description', 'memberEdit', 'updatedAt']));
+
+      match /tasks/{taskId} {
+        allow read: if canSeeSpace(spaceId);
+        allow create: if canEditSpace(spaceId) && incoming().spaceId == spaceId
+          && incoming().createdBy == uid() && validTask(incoming());
+        allow update: if canSeeSpace(spaceId)
+          && incoming().spaceId == existing().spaceId
+          && incoming().createdBy == existing().createdBy
+          && validTask(incoming())
+          && (canEditSpace(spaceId)
+              || (uid() in existing().assignees && onlyChanged(['status', 'order', 'updatedAt', 'completedAt'])));
+        allow delete: if (lead() && canSeeSpace(spaceId))
+          || (canEditSpace(spaceId) && existing().createdBy == uid());
+      }
+    }
+
+    match /spaceContent/{spaceId} {
+      allow read: if canSeeSpace(spaceId);
+      // Admins create it together with a new space (before the space exists).
+      allow create: if (admin() || canEditSpace(spaceId)) && validContent(incoming());
+      allow update: if validContent(incoming()) && (
+        (lead() && canSeeSpace(spaceId))
+        || (canEditSpace(spaceId) && onlyChanged(['tree', 'updatedAt'])));
+      allow delete: if admin();
     }
 
     match /pages/{pageId} {
-      allow read: if active();
+      allow read: if admin() || canSeeSpace(resource.data.spaceId);
       allow create: if canEditSpace(incoming().spaceId)
         && str(incoming().title, 1, 200)
         && incoming().createdBy == uid() && incoming().updatedBy == uid()
@@ -276,26 +341,8 @@ service cloud.firestore {
         && str(incoming().title, 1, 200)
         && incoming().updatedBy == uid() && incoming().updatedByName == me().name
         && incoming().rev == existing().rev + 1;
-      allow delete: if lead() || (canEditSpace(existing().spaceId) && existing().createdBy == uid());
-    }
-
-    function validTask(d) {
-      return str(d.title, 1, 200) && optStr(d, 'description', 4000)
-        && d.status in ['todo', 'doing', 'blocked', 'done']
-        && d.assignees is list && d.assignees.size() <= 12
-        && d.priority in ['low', 'normal', 'high']
-        && (d.due == null || str(d.due, 10, 10));
-    }
-
-    match /tasks/{taskId} {
-      allow read: if active();
-      allow create: if canEditSpace(incoming().spaceId) && incoming().createdBy == uid() && validTask(incoming());
-      allow update: if active() && incoming().spaceId == existing().spaceId
-        && incoming().createdBy == existing().createdBy
-        && validTask(incoming())
-        && (canEditSpace(existing().spaceId)
-            || (uid() in existing().assignees && onlyChanged(['status', 'order', 'updatedAt', 'completedAt'])));
-      allow delete: if lead() || (canEditSpace(existing().spaceId) && existing().createdBy == uid());
+      allow delete: if admin() || (lead() && canSeeSpace(existing().spaceId))
+        || (canEditSpace(existing().spaceId) && existing().createdBy == uid());
     }
 
     // ───────────── audit log ─────────────

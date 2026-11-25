@@ -1,10 +1,10 @@
 // The signed-in portal: sidebar, mobile chrome, search palette and routes.
 import { html, useState, useEffect, useRef, useMemo, Icon, Avatar, useNow, toastError } from '../lib/ui.js';
-import { useStore, setState, getState, isLead, isAdmin, DEFAULT_SETTINGS } from '../lib/store.js';
+import { useStore, setState, getState, isLead, isAdmin, DEFAULT_SETTINGS, visibleSpaces, groupBySubsidiary, treeOf, spaceLabel } from '../lib/store.js';
 import { useRoute, href, go } from '../lib/router.js';
 import { clockParts } from '../lib/time.js';
 import { nest } from '../data/tree.js';
-import { DemoBar, setBrowserColor } from './common.js';
+import { DemoBar, setBrowserColor, SpaceIcon } from './common.js';
 import { Home } from './home.js';
 import { TimeView } from './time.js';
 import { Reports } from './reports.js';
@@ -12,7 +12,7 @@ import { CalendarView } from './calendar.js';
 import { Announcements } from './announcements.js';
 import { MyTasks, Board } from './tasks.js';
 import { Members, MemberProfile, EditProfile } from './members.js';
-import { SpacesIndex, SpaceHome, PageView } from './spaces.js';
+import { SpacesIndex, SpaceHome, PageView, openNewSpace } from './spaces.js';
 import { Admin } from './admin.js';
 
 const ROLE_LABEL = { admin: 'Admin', lead: 'Lead', member: 'Member' };
@@ -27,10 +27,11 @@ export function Portal() {
   useEffect(() => {
     const offs = [
       api.watchSettings((s) => setState({ settingsSaved: !!s, settings: { ...DEFAULT_SETTINGS, ...(s || {}), locationCheck: { ...DEFAULT_SETTINGS.locationCheck, ...(s?.locationCheck || {}) } } }), (e) => toastError(e, 'Couldn’t load club settings.')),
-      api.watchRefs(({ subteams, activities, spaces }) => setState({
+      api.watchRefs(({ subteams, activities, spaces, subsidiaries }) => setState({
         subteams: subteams.filter((x) => !x.archived).sort(byOrder),
         activities: activities.sort(byOrder),
         spaces: spaces.sort(byOrder),
+        subsidiaries: subsidiaries.sort(byOrder),
       }), (e) => toastError(e, 'Couldn’t load subteams and spaces.')),
       api.watchPresence((p) => setState({ presence: p })),
     ];
@@ -38,6 +39,16 @@ export function Portal() {
     if (admin) offs.push(api.watchPendingMembers((m) => setState({ pendingMembers: m })));
     return () => offs.forEach((f) => f && f());
   }, [api, profile.uid, lead, admin]);
+
+  // Page outlines and Drive folders, for the spaces this person can open.
+  const openable = useStore((s) => visibleSpaces(s).map((sp) => sp.id).join(','));
+  useEffect(() => {
+    const ids = openable ? openable.split(',') : [];
+    const offs = ids.map((id) => api.watchSpaceContent(id,
+      (c) => setState((st) => ({ contents: { ...st.contents, [id]: { tree: c?.tree || [], driveFolder: c?.driveFolder || null } } })),
+      () => setState((st) => ({ contents: { ...st.contents, [id]: { tree: [], driveFolder: null, denied: true } } }))));
+    return () => offs.forEach((f) => f && f());
+  }, [api, openable]);
 
   // Close the drawer whenever the route changes.
   useEffect(() => { if (getState().railOpen) setState({ railOpen: false }); window.scrollTo(0, 0); }, [route.path]);
@@ -113,12 +124,13 @@ function NavLink({ to, icon, label, route, count }) {
 function readOpen() { try { return JSON.parse(localStorage.getItem('er-tree-open') || '{}'); } catch { return {}; } }
 
 function Rail({ route }) {
-  const { profile, spaces, railOpen, pendingFixes, pendingMembers } = useStore((s) => ({ profile: s.profile, spaces: s.spaces, railOpen: s.railOpen, pendingFixes: s.pendingFixes, pendingMembers: s.pendingMembers }));
+  const { profile, railOpen, pendingFixes, pendingMembers, subsidiaries } = useStore((s) => ({ profile: s.profile, railOpen: s.railOpen, pendingFixes: s.pendingFixes, pendingMembers: s.pendingMembers, subsidiaries: s.subsidiaries }));
+  const spaces = useStore((s) => visibleSpaces(s));
   const [open, setOpen] = useState(readOpen);
-  const toggle = (id) => { const next = { ...open, [id]: !open[id] }; setOpen(next); try { localStorage.setItem('er-tree-open', JSON.stringify(next)); } catch { /* ignore */ } };
+  const toggle = (id, value) => { const next = { ...open, [id]: value }; setOpen(next); try { localStorage.setItem('er-tree-open', JSON.stringify(next)); } catch { /* ignore */ } };
   const lead = isLead(profile), admin = isAdmin(profile);
-  const activeSpace = route.parts[0] === 's' ? route.parts[1] : null;
-  const activePage = route.parts[0] === 'p' ? route.parts[1] : null;
+  const groups = groupBySubsidiary(spaces, subsidiaries).filter((g) => g.items.length || (admin && g.sub));
+  const rowProps = { route, open, toggle };
 
   return html`<nav class=${'rail' + (railOpen ? ' open' : '')} aria-label="Portal">
     <a class="wordmark" href="#/"><img src="assets/mark.png" alt="" /><span><b>Engineering Renaissance</b><small>Member portal</small></span></a>
@@ -133,21 +145,13 @@ function Rail({ route }) {
       <${NavLink} to="/members" icon="users" label="Members" route=${route} />
     </div>
     <div class="rail-group">
-      <div class="rail-group-head"><span>Spaces</span>
+      <div class="rail-group-head"><a href="#/spaces">Spaces</a>
         <button onClick=${() => setState({ paletteOpen: true })} aria-label="Search pages"><${Icon} name="search" size=${15} /></button></div>
       <div class="tree">
-        ${spaces.map((sp) => {
-          const isOpen = open[sp.id] ?? (activeSpace === sp.id || (sp.tree || []).some((n) => n.id === activePage));
-          return html`<div key=${sp.id}>
-            <div class="tree-row" aria-current=${activeSpace === sp.id && route.parts.length === 2 ? 'page' : undefined}>
-              <button class="twist" aria-expanded=${String(!!isOpen)} aria-label=${(isOpen ? 'Collapse ' : 'Expand ') + sp.name} onClick=${() => toggle(sp.id)}><${Icon} name="chevronRight" /></button>
-              <a href=${href('/s/' + sp.id)} class="row" style="gap:8px;color:inherit;text-decoration:none;min-width:0;flex:1">
-                <span class="emoji">${sp.icon || '📁'}</span><span class="name">${sp.name}</span></a>
-            </div>
-            ${isOpen && html`<${TreeNodes} nodes=${nest(sp.tree || [])} depth=${1} activePage=${activePage} open=${open} toggle=${toggle} />`}
-          </div>`;
-        })}
-        ${!spaces.length && html`<div class="tiny" style="padding:4px 10px;color:var(--rail-dim)">${admin ? 'Add spaces in Admin.' : 'No spaces yet.'}</div>`}
+        ${groups.map((g) => (g.sub
+          ? html`<${SpaceGroup} key=${g.sub.id} sub=${g.sub} items=${g.items} admin=${admin} ...${rowProps} />`
+          : g.items.map((sp) => html`<${SpaceRow} key=${sp.id} sp=${sp} ...${rowProps} />`)))}
+        ${!spaces.length && !subsidiaries.length && html`<div class="tiny" style="padding:4px 10px;color:var(--rail-dim)">${admin ? 'Add spaces in Admin.' : 'No spaces yet.'}</div>`}
       </div>
     </div>
     <div class="rail-foot">
@@ -158,13 +162,45 @@ function Rail({ route }) {
   </nav>`;
 }
 
+// A subsidiary (Crush Depth, Prosthetic…) with its spaces under it, like a channel category.
+// Folded up, it still shows the space you're in.
+function SpaceGroup({ sub, items, admin, route, open, toggle }) {
+  const key = 'g:' + sub.id;
+  const isOpen = open[key] ?? true;
+  const here = (sp) => (route.parts[0] === 's' && route.parts[1] === sp.id) || (route.parts[0] === 'p' && treeOf(sp.id).some((n) => n.id === route.parts[1]));
+  const shown = isOpen ? items : items.filter(here);
+  return html`<div class="space-group" role="group" aria-label=${sub.name}>
+    <div class="group-head">
+      <button class="group-toggle" aria-expanded=${String(isOpen)} onClick=${() => toggle(key, !isOpen)}><${Icon} name="chevronDown" /><span class="name">${sub.name}</span></button>
+      ${admin && html`<button class="group-add" aria-label=${'New space in ' + sub.name} title=${'New space in ' + sub.name} onClick=${() => openNewSpace({ subsidiaryId: sub.id })}><${Icon} name="plus" size=${15} /></button>`}
+    </div>
+    ${shown.map((sp) => html`<${SpaceRow} key=${sp.id} sp=${sp} route=${route} open=${open} toggle=${toggle} />`)}
+    ${isOpen && !items.length && html`<div class="tiny group-empty">No spaces yet.</div>`}
+  </div>`;
+}
+
+function SpaceRow({ sp, route, open, toggle }) {
+  const tree = useStore((s) => treeOf(sp.id, s));
+  const activeSpace = route.parts[0] === 's' ? route.parts[1] : null;
+  const activePage = route.parts[0] === 'p' ? route.parts[1] : null;
+  const isOpen = open[sp.id] ?? (activeSpace === sp.id || tree.some((n) => n.id === activePage));
+  return html`<div>
+    <div class="tree-row space-row" aria-current=${activeSpace === sp.id && route.parts.length === 2 ? 'page' : undefined}>
+      <a href=${href('/s/' + sp.id)} class="space-link"><${SpaceIcon} space=${sp} />
+        <span class="name">${sp.name}</span>${sp.private && html`<span class="sr-only"> (private)</span>`}</a>
+      ${tree.length > 0 && html`<button class="twist" aria-expanded=${String(!!isOpen)} aria-label=${(isOpen ? 'Hide pages in ' : 'Show pages in ') + sp.name} onClick=${() => toggle(sp.id, !isOpen)}><${Icon} name="chevronRight" /></button>`}
+    </div>
+    ${isOpen && tree.length > 0 && html`<${TreeNodes} nodes=${nest(tree)} depth=${1} activePage=${activePage} open=${open} toggle=${toggle} />`}
+  </div>`;
+}
+
 function TreeNodes({ nodes, depth, activePage, open, toggle }) {
   return html`${nodes.map((n) => {
     const hasKids = n.children.length > 0;
     const isOpen = open['p:' + n.id] ?? hasDescendant(n, activePage);
     return html`<div key=${n.id}>
       <div class="tree-row" style=${{ paddingLeft: 8 + depth * 14 + 'px' }} aria-current=${activePage === n.id ? 'page' : undefined}>
-        ${hasKids ? html`<button class="twist" aria-expanded=${String(!!isOpen)} aria-label=${(isOpen ? 'Collapse ' : 'Expand ') + n.title} onClick=${() => toggle('p:' + n.id)}><${Icon} name="chevronRight" /></button>` : html`<span class="twist"></span>`}
+        ${hasKids ? html`<button class="twist" aria-expanded=${String(!!isOpen)} aria-label=${(isOpen ? 'Collapse ' : 'Expand ') + n.title} onClick=${() => toggle('p:' + n.id, !isOpen)}><${Icon} name="chevronRight" /></button>` : html`<span class="twist"></span>`}
         <a href=${href('/p/' + n.id)} class="row" style="gap:8px;color:inherit;text-decoration:none;min-width:0;flex:1"><span class="emoji">${n.icon || '📄'}</span><span class="name">${n.title}</span></a>
       </div>
       ${hasKids && isOpen && html`<${TreeNodes} nodes=${n.children} depth=${depth + 1} activePage=${activePage} open=${open} toggle=${toggle} />`}
@@ -200,7 +236,8 @@ function Tabbar({ route }) {
 
 // ── Search palette (Ctrl/Cmd + K) ──
 function Palette() {
-  const { open, spaces, profile, members } = useStore((s) => ({ open: !!s.paletteOpen, spaces: s.spaces, profile: s.profile, members: s.membersCache }));
+  const { open, profile, members, contents } = useStore((s) => ({ open: !!s.paletteOpen, profile: s.profile, members: s.membersCache, contents: s.contents }));
+  const spaces = useStore((s) => visibleSpaces(s));
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
   const inputRef = useRef();
@@ -231,9 +268,9 @@ function Palette() {
       admin && { label: 'Admin', to: '/admin', icon: 'shield', kind: 'Go to' },
     ].filter(Boolean);
     const sp = spaces.flatMap((s) => [
-      { label: s.name, to: '/s/' + s.id, icon: 'folder', kind: 'Space', emoji: s.icon },
-      { label: `${s.name} task board`, to: `/s/${s.id}/board`, icon: 'board', kind: 'Board' },
-      ...(s.tree || []).map((n) => ({ label: n.title, to: '/p/' + n.id, icon: 'page', kind: s.name, emoji: n.icon })),
+      { label: spaceLabel(s), to: '/s/' + s.id, icon: s.private ? 'hashLock' : 'hash', kind: 'Space' },
+      { label: `${spaceLabel(s)} task board`, to: `/s/${s.id}/board`, icon: 'board', kind: 'Board' },
+      ...(contents[s.id]?.tree || []).map((n) => ({ label: n.title, to: '/p/' + n.id, icon: 'page', kind: '#' + spaceLabel(s), emoji: n.icon })),
     ]);
     const people = (members || []).map((m) => ({ label: m.name, to: '/members/' + m.uid, icon: 'user', kind: 'Member' }));
     const all = [...base, ...sp, ...people];
@@ -242,7 +279,7 @@ function Palette() {
     return all
       .map((it) => { const l = it.label.toLowerCase(); const i = l.indexOf(needle); return { it, score: i < 0 ? -1 : (i === 0 ? 0 : l[i - 1] === ' ' ? 1 : 2) }; })
       .filter((x) => x.score >= 0).sort((a, b) => a.score - b.score || a.it.label.length - b.it.label.length).slice(0, 20).map((x) => x.it);
-  }, [q, spaces, members, profile]);
+  }, [q, spaces, members, profile, contents]);
 
   if (!open) return null;
   const close = () => setState({ paletteOpen: false });

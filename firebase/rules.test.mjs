@@ -1,6 +1,8 @@
-// Security rules tests. They run against the local Firestore emulator (needs Java 11+):
+// Security rules tests. They run against the local Firestore emulator (needs Java 21+):
 //
 //   cd firebase && npm install && npm test
+//
+// GitHub runs them too whenever firebase/ changes (.github/workflows/portal-checks.yml).
 //
 // Each test signs in as a different kind of person and checks what the rules allow.
 import { test, before, after, beforeEach } from 'node:test';
@@ -36,8 +38,15 @@ beforeEach(async () => {
     await setDoc(doc(db, 'users/other'), profile('other', 'member', 'active'));
     await setDoc(doc(db, 'users/pend'), profile('pend', 'member', 'pending'));
     await setDoc(doc(db, 'config/settings'), { maxSessionHours: 10 });
-    await setDoc(doc(db, 'spaces/open'), { name: 'Open', memberEdit: true, tree: [] });
-    await setDoc(doc(db, 'spaces/locked'), { name: 'Locked', memberEdit: false, tree: [] });
+    await setDoc(doc(db, 'spaces/open'), { name: 'Open', memberEdit: true });
+    await setDoc(doc(db, 'spaces/locked'), { name: 'Locked', memberEdit: false });
+    // A private space: "mem" was let in, "other" wasn't.
+    await setDoc(doc(db, 'spaces/leads'), { name: 'tech-leads', memberEdit: true, private: true, subsidiaryId: 'crush' });
+    await updateDoc(doc(db, 'users/mem'), { spaces: ['leads'] });
+    for (const id of ['open', 'locked', 'leads']) await setDoc(doc(db, 'spaceContent', id), { tree: [{ id: 'p-' + id, title: 'Plans', icon: '📄', parentId: null, order: 1 }], driveFolder: null });
+    await setDoc(doc(db, 'pages/secret'), { spaceId: 'leads', parentId: null, title: 'Plans', icon: '📄', order: 1, content: { blocks: [] }, rev: 1, createdBy: 'lead', createdByName: 'Lead Person', updatedBy: 'lead', updatedByName: 'Lead Person' });
+    await setDoc(doc(db, 'spaces/leads/tasks/t9'), { spaceId: 'leads', title: 'Design review', description: '', status: 'todo', assignees: ['other'], due: null, priority: 'normal', labels: [], order: 1, createdBy: 'admin' });
+    await setDoc(doc(db, 'subsidiaries/crush'), { name: 'Crush Depth', order: 1 });
     await setDoc(doc(db, 'invites/new.officer@example.com'), { email: 'new.officer@example.com', role: 'lead', subteams: ['media'], title: 'Media Lead' });
     // "other" forgot to clock out 12 hours ago.
     const start = Timestamp.fromMillis(Date.now() - 12 * HOUR);
@@ -180,10 +189,78 @@ test('page saves must bump the revision (no silent overwrites)', async () => {
 });
 
 test('people on a task can move it; others in a locked space can’t', async () => {
-  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'tasks/t1'), { spaceId: 'locked', title: 'Tap holes', description: '', status: 'todo', assignees: ['mem'], due: null, priority: 'normal', labels: [], order: 1, createdBy: 'lead' }));
-  await assertSucceeds(updateDoc(doc(as('mem'), 'tasks/t1'), { status: 'doing', order: 2 }));
-  await assertFails(updateDoc(doc(as('mem'), 'tasks/t1'), { title: 'Renamed' }));
-  await assertFails(updateDoc(doc(as('other'), 'tasks/t1'), { status: 'done' }));
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'spaces/locked/tasks/t1'), { spaceId: 'locked', title: 'Tap holes', description: '', status: 'todo', assignees: ['mem'], due: null, priority: 'normal', labels: [], order: 1, createdBy: 'lead' }));
+  await assertSucceeds(updateDoc(doc(as('mem'), 'spaces/locked/tasks/t1'), { status: 'doing', order: 2 }));
+  await assertFails(updateDoc(doc(as('mem'), 'spaces/locked/tasks/t1'), { title: 'Renamed' }));
+  await assertFails(updateDoc(doc(as('other'), 'spaces/locked/tasks/t1'), { status: 'done' }));
+  const task = { spaceId: 'open', title: 'Print jaws', description: '', status: 'todo', assignees: [], due: null, priority: 'normal', labels: [], order: 1 };
+  await assertSucceeds(addDoc(collection(as('mem'), 'spaces/open/tasks'), { ...task, createdBy: 'mem' }));
+  // The task's spaceId has to match the board it's on.
+  await assertFails(addDoc(collection(as('mem'), 'spaces/open/tasks'), { ...task, spaceId: 'locked', createdBy: 'mem' }));
+});
+
+// ── Private spaces ──
+test('private spaces: only people let in read the outline, pages and tasks', async () => {
+  // Every active member can list spaces (names only), so the sidebar knows what exists.
+  await assertSucceeds(getDocs(collection(as('other'), 'spaces')));
+  await assertFails(getDocs(collection(as('pend'), 'spaces')));
+  // Outline
+  await assertSucceeds(getDoc(doc(as('mem'), 'spaceContent/leads')));
+  await assertSucceeds(getDoc(doc(as('admin'), 'spaceContent/leads')));
+  await assertFails(getDoc(doc(as('other'), 'spaceContent/leads')));
+  await assertFails(getDoc(doc(as('lead'), 'spaceContent/leads')));   // leads aren't let in automatically
+  await assertSucceeds(getDoc(doc(as('other'), 'spaceContent/open')));
+  // Pages
+  await assertSucceeds(getDoc(doc(as('mem'), 'pages/secret')));
+  await assertFails(getDoc(doc(as('other'), 'pages/secret')));
+  await assertFails(setDoc(doc(as('other'), 'pages/p5'), page('leads', 'other')));
+  await assertSucceeds(setDoc(doc(as('mem'), 'pages/p5'), page('leads', 'mem')));
+  await assertFails(deleteDoc(doc(as('lead'), 'pages/secret')));
+  // Tasks: being assigned isn't enough to see a private board.
+  await assertSucceeds(getDocs(collection(as('mem'), 'spaces/leads/tasks')));
+  await assertFails(getDocs(collection(as('other'), 'spaces/leads/tasks')));
+  await assertFails(getDocs(query(collection(as('other'), 'spaces/leads/tasks'), where('assignees', 'array-contains', 'other'))));
+  await assertSucceeds(getDocs(query(collection(as('mem'), 'spaces/open/tasks'), where('assignees', 'array-contains', 'mem'))));
+});
+
+test('members can’t let themselves into a private space', async () => {
+  await assertFails(updateDoc(doc(as('other'), 'users/other'), { spaces: ['leads'] }));
+  await assertFails(setDoc(doc(as('pend'), 'users/pend'), { spaces: ['leads'] }, { merge: true }));
+  await assertFails(updateDoc(doc(as('lead'), 'users/other'), { spaces: ['leads'] }));
+  await assertSucceeds(updateDoc(doc(as('admin'), 'users/other'), { spaces: ['leads'] }));
+  await assertSucceeds(getDoc(doc(as('other'), 'spaceContent/leads')));
+  // A new visitor can't sign up already inside one either.
+  await assertFails(setDoc(doc(as('newbie', 'newbie@example.com'), 'users/newbie'), { ...profile('newbie', 'member', 'pending'), createdAt: serverTimestamp(), spaces: ['leads'] }));
+});
+
+test('leads rename spaces they can open; only admins change who can open them', async () => {
+  await assertSucceeds(updateDoc(doc(as('lead'), 'spaces/open'), { name: 'general', description: 'Everything else' }));
+  await assertFails(updateDoc(doc(as('lead'), 'spaces/open'), { private: true }));
+  await assertFails(updateDoc(doc(as('lead'), 'spaces/leads'), { name: 'renamed' }));   // not let in
+  await assertFails(updateDoc(doc(as('mem'), 'spaces/leads'), { private: false }));
+  await assertSucceeds(updateDoc(doc(as('admin'), 'spaces/leads'), { private: false }));
+  await assertSucceeds(getDoc(doc(as('other'), 'spaceContent/leads')));
+});
+
+test('outlines: editors change the page list, leads also link the Drive folder', async () => {
+  const tree = [{ id: 'x', title: 'New', icon: '📄', parentId: null, order: 1 }];
+  await assertSucceeds(updateDoc(doc(as('other'), 'spaceContent/open'), { tree }));
+  await assertFails(updateDoc(doc(as('other'), 'spaceContent/open'), { driveFolder: { id: 'f', name: 'Files', url: '' } }));
+  await assertSucceeds(updateDoc(doc(as('lead'), 'spaceContent/open'), { driveFolder: { id: 'f', name: 'Files', url: '' } }));
+  await assertFails(updateDoc(doc(as('other'), 'spaceContent/locked'), { tree }));
+  await assertFails(updateDoc(doc(as('other'), 'spaceContent/open'), { secret: 'x' }));
+  // An admin creates a space and its outline in one batch.
+  const db = as('admin');
+  const b = writeBatch(db);
+  b.set(doc(db, 'spaces/new'), { name: 'float', memberEdit: true, private: false });
+  b.set(doc(db, 'spaceContent/new'), { tree: [], driveFolder: null });
+  await assertSucceeds(b.commit());
+});
+
+test('subsidiaries: everyone signed in reads them, only admins write', async () => {
+  await assertSucceeds(getDoc(doc(as('pend'), 'subsidiaries/crush')));
+  await assertFails(setDoc(doc(as('lead'), 'subsidiaries/prosthetic'), { name: 'Prosthetic', order: 2 }));
+  await assertSucceeds(setDoc(doc(as('admin'), 'subsidiaries/prosthetic'), { name: 'Prosthetic', order: 2 }));
 });
 
 // ── Club content and audit ──

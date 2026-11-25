@@ -1,7 +1,7 @@
 // Reports (leads and admins): filter sessions by any combination of criteria, group them,
 // chart them, and export to CSV or Google Sheets.
 import { html, useState, useMemo, useEffect, Icon, Field, MultiSelect, Seg, Loading, Empty, Notice, Menu, StatusBadge, useAsync, toast, toastError, openModal, Modal, Avatar } from '../lib/ui.js';
-import { useStore, setState, getState, activityById, subteamById } from '../lib/store.js';
+import { useStore, setState, getState, activityById, subteamById, subteamLabel, subsidiaryById } from '../lib/store.js';
 import { href } from '../lib/router.js';
 import {
   presetRange, RANGE_PRESETS, isoDate, parseIsoDate, addDays, startOfDay, fmtDate, fmtShortDate, fmtTime, fmtRange, fmtDuration,
@@ -14,7 +14,7 @@ import { buildTimeline, fillTimeline, openEntryEditor } from './time.js';
 import { driveConfigured, exportToSheets } from '../google/drive.js';
 import { useTitle } from './common.js';
 
-const GROUPS = [['member', 'Member'], ['subteam', 'Subteam'], ['activity', 'Activity'], ['event', 'Event'], ['week', 'Week'], ['day', 'Day']];
+const GROUPS = [['member', 'Member'], ['subteam', 'Subteam'], ['subsidiary', 'Subsidiary'], ['activity', 'Activity'], ['event', 'Event'], ['week', 'Week'], ['day', 'Day']];
 const STATUSES = [{ value: 'complete', label: 'Counted' }, { value: 'pending', label: 'Waiting for approval' }, { value: 'rejected', label: 'Not counted' }, { value: 'open', label: 'Still clocked in' }];
 const SOURCES = [{ value: 'clock', label: 'Clocked in by the member' }, { value: 'lead', label: 'Added by a lead' }];
 const GEO = [{ value: 'on-site', label: 'At the lab' }, { value: 'off-site', label: 'Away from the lab' }, { value: 'unknown', label: 'Location unknown' }, { value: 'none', label: 'No location check' }];
@@ -31,7 +31,13 @@ function loadViews() { try { return JSON.parse(localStorage.getItem('er-report-v
 
 export function Reports() {
   useTitle('Reports');
-  const { api, settings, subteams, activities, profile } = useStore((s) => ({ api: s.api, settings: s.settings, subteams: s.subteams, activities: s.activities, profile: s.profile }));
+  const { api, settings, subteams, activities, profile, subsidiaries } = useStore((s) => ({ api: s.api, settings: s.settings, subteams: s.subteams, activities: s.activities, profile: s.profile, subsidiaries: s.subsidiaries }));
+  // Which subsidiary a session's subteam belongs to: an id, 'club' (club-wide subteam) or 'none'.
+  const subsidiaryKey = (e) => {
+    const t = e.subteamId && subteamById(e.subteamId);
+    if (!t) return 'none';
+    return subsidiaryById(t.subsidiaryId) ? t.subsidiaryId : 'club';
+  };
   const [f, setF] = useState(loadFilters);
   const [views, setViews] = useState(loadViews);
   const [sort, setSort] = useState({ key: 'value', dir: -1 });
@@ -69,7 +75,8 @@ export function Reports() {
 
   const groupOf = (e) => {
     switch (f.groupBy) {
-      case 'subteam': return [e.subteamId || 'none', subteamById(e.subteamId)?.name || 'No subteam', subteamById(e.subteamId)?.color || 'other'];
+      case 'subteam': return [e.subteamId || 'none', subteamLabel(e.subteamId) || 'No subteam', subteamById(e.subteamId)?.color || 'other'];
+      case 'subsidiary': { const k = subsidiaryKey(e); return [k, k === 'none' ? 'No subteam' : k === 'club' ? 'Club-wide' : subsidiaryById(k).name]; }
       case 'activity': return [e.activityId || 'none', activityById(e.activityId)?.name || 'No activity'];
       case 'event': { const ev = eventById.get(e.eventId); return [e.eventId || 'none', ev ? `${ev.title}, ${fmtShortDate(ev.start)}` : e.eventId ? 'Deleted event' : 'Not tied to an event']; }
       case 'week': return [weekKey(e.start), `Week of ${fmtShortDate(startOfWeek(e.start))}`];
@@ -105,11 +112,19 @@ export function Reports() {
 
   const timeline = useMemo(() => {
     const tl = buildTimeline(filtered, range);
-    fillTimeline(tl, filtered, (e) => e.subteamId && subteamById(e.subteamId) ? e.subteamId : 'none');
-    const used = new Set(filtered.map((e) => (e.subteamId && subteamById(e.subteamId) ? e.subteamId : 'none')));
-    const series = [...subteams.filter((s) => used.has(s.id)).map((s) => ({ key: s.id, label: s.name, color: s.color })), ...(used.has('none') ? [{ key: 'none', label: 'No subteam', color: 'other' }] : [])];
-    return { ...tl, series };
-  }, [filtered, rk, subteams]);
+    // With subsidiaries there are more subteams than distinct colors, so the bars stack by
+    // subsidiary instead; the table below still breaks hours down by subteam.
+    const bySub = subsidiaries.length > 0;
+    const keyOf = bySub ? subsidiaryKey : (e) => (e.subteamId && subteamById(e.subteamId) ? e.subteamId : 'none');
+    fillTimeline(tl, filtered, keyOf);
+    const used = new Set(filtered.map(keyOf));
+    const series = bySub
+      ? [...subsidiaries.filter((s) => used.has(s.id)).map((s) => ({ key: s.id, label: s.name, color: s.color || 'sky' })),
+        ...(used.has('club') ? [{ key: 'club', label: 'Club-wide', color: 'gold' }] : [])]
+      : subteams.filter((s) => used.has(s.id)).map((s) => ({ key: s.id, label: subteamLabel(s), color: s.color }));
+    if (used.has('none')) series.push({ key: 'none', label: 'No subteam', color: 'other' });
+    return { ...tl, series, bySub };
+  }, [filtered, rk, subteams, subsidiaries]);
 
   // ── Exports ──
   const label = `${isoDate(range.from)}_to_${isoDate(addDays(range.to, -1))}`;
@@ -119,7 +134,7 @@ export function Reports() {
   const detailRows = () => [['Date', 'Member', 'Email', 'Subteam', 'Activity', 'Event', 'Start', 'End', 'Hours', 'Status', 'Source', 'Location', 'Note', 'Got done', 'Fix note', 'Lead note'],
     ...filtered.map((e) => {
       const m = memberById.get(e.uid);
-      return [isoDate(e.start), m?.name || e.name, m?.email || '', subteamById(e.subteamId)?.name || '', activityById(e.activityId)?.name || '', eventById.get(e.eventId)?.title || '',
+      return [isoDate(e.start), m?.name || e.name, m?.email || '', subteamLabel(e.subteamId), activityById(e.activityId)?.name || '', eventById.get(e.eventId)?.title || '',
         fmtTime(e.start), e.end ? fmtTime(e.end) : '', fmtHours(hours(entryMs(e)), 2), e.status, e.source, e.geo || '', e.note || '', e.outNote || '', e.fix?.reason || '', e.reviewNote || ''];
     })];
   const toSheets = async () => {
@@ -136,7 +151,7 @@ export function Reports() {
   }} />`);
 
   const memberOpts = (membersRes.data || []).slice().sort((a, b) => a.name.localeCompare(b.name)).map((m) => ({ value: m.uid, label: m.name + (m.status !== 'active' ? ` (${m.status})` : '') }));
-  const subOpts = [...subteams.map((s) => ({ value: s.id, label: s.name, color: seriesColor(s.color) })), { value: 'none', label: 'No subteam' }];
+  const subOpts = [...subteams.map((s) => ({ value: s.id, label: subteamLabel(s), color: seriesColor(s.color) })), { value: 'none', label: 'No subteam' }];
   const actOpts = [...activities.map((a) => ({ value: a.id, label: a.name })), { value: 'none', label: 'No activity' }];
   const evOpts = [...(eventsRes.data || []).map((e) => ({ value: e.id, label: `${e.title}, ${fmtShortDate(e.start)}` })), { value: 'none', label: 'Not tied to an event' }];
   const activeFilters = ['members', 'subteams', 'activities', 'events', 'sources', 'geo'].filter((k) => f[k].length).length + (f.q ? 1 : 0) + (f.statuses.join() !== 'complete' ? 1 : 0);
@@ -168,7 +183,7 @@ export function Reports() {
           <${Field} label="To"><input class="input" type="date" value=${f.to} onInput=${(e) => set({ to: e.target.value })} /></${Field}>`
         : html`<div class="field" style="grid-column:span 2"><span>Range</span><div class="input" style="display:flex;align-items:center;background:var(--panel-2)">${fmtDate(range.from)} – ${fmtDate(addDays(range.to, -1))}</div></div>`}
         <${Field} label="Group by"><select class="select" value=${f.groupBy} onChange=${(e) => { set({ groupBy: e.target.value }); setSort({ key: e.target.value === 'week' || e.target.value === 'day' ? 'label' : 'value', dir: e.target.value === 'week' || e.target.value === 'day' ? 1 : -1 }); setOpen(null); }}>
-          ${GROUPS.map(([k, l]) => html`<option value=${k} key=${k}>${l}</option>`)}</select></${Field}>
+          ${GROUPS.filter(([k]) => k !== 'subsidiary' || subsidiaries.length).map(([k, l]) => html`<option value=${k} key=${k}>${l}</option>`)}</select></${Field}>
         <div class="field"><span>Members</span><${MultiSelect} options=${memberOpts} value=${f.members} onChange=${(v) => set({ members: v })} allLabel="Everyone" searchable /></div>
         <div class="field"><span>Subteams</span><${MultiSelect} options=${subOpts} value=${f.subteams} onChange=${(v) => set({ subteams: v })} allLabel="All subteams" /></div>
         <div class="field"><span>Activities</span><${MultiSelect} options=${actOpts} value=${f.activities} onChange=${(v) => set({ activities: v })} allLabel="All activities" /></div>
@@ -196,7 +211,7 @@ export function Reports() {
 
       ${!filtered.length ? html`<div class="panel" style="margin-top:16px"><${Empty} title="No sessions match">Widen the dates or clear a filter.</${Empty}></div>` : html`
       <div class=${timeGrouped ? '' : 'grid-chart'} style="margin-top:16px">
-        <section class="panel"><div class="panel-head"><h2>Hours per ${timeline.unit}${timeline.series.length > 1 ? ', by subteam' : ''}</h2></div>
+        <section class="panel"><div class="panel-head"><h2>Hours per ${timeline.unit}${timeline.series.length > 1 ? (timeline.bySub ? ', by subsidiary' : ', by subteam') : ''}</h2></div>
           <div class="panel-body"><${ColumnChart} points=${timeline.points} series=${timeline.series} title=${'Hours per ' + timeline.unit} /></div></section>
         ${!timeGrouped && html`<section class="panel"><div class="panel-head"><h2>Top ${groupName.toLowerCase()}s by hours</h2><span class="small muted">${groups.list.length > 12 ? `12 of ${groups.list.length}` : ''}</span></div>
           <div class="panel-body"><${BarList} rows=${groups.list.slice().sort((a, b) => b.value - a.value).slice(0, 12).map((g) => ({ key: g.key, label: g.label, value: g.value, color: f.groupBy === 'subteam' ? g.color : undefined, detail: plural(g.sessions, 'session') }))}
@@ -229,7 +244,7 @@ export function Reports() {
           <td class="nowrap">${fmtRange(e.start, e.end)}</td>
           <td class="num">${fmtHours(hours(entryMs(e)), 2)}</td>
           <td>${activityById(e.activityId)?.name || html`<span class="muted">None</span>`}</td>
-          <td class="nowrap">${subteamById(e.subteamId) ? html`<span class="row" style="gap:6px"><i style=${{ width: '8px', height: '8px', borderRadius: '50%', background: seriesColor(subteamById(e.subteamId).color) }}></i>${subteamById(e.subteamId).name}</span>` : html`<span class="muted">None</span>`}</td>
+          <td class="nowrap">${subteamById(e.subteamId) ? html`<span class="row" style="gap:6px"><i style=${{ width: '8px', height: '8px', borderRadius: '50%', background: seriesColor(subteamById(e.subteamId).color) }}></i>${subteamLabel(e.subteamId)}</span>` : html`<span class="muted">None</span>`}</td>
           <td><${StatusBadge} status=${e.status} />${e.source === 'lead' ? html` <span class="badge badge-plain">Lead</span>` : ''}${e.geo === 'off-site' ? html` <span class="badge badge-plain">Away</span>` : ''}</td>
           <td class="small" style="max-width:280px">${[e.note, e.outNote, e.fix?.reason].filter(Boolean).join(' / ')}</td>
           <td><button class="btn btn-sm btn-quiet btn-icon" aria-label=${'Edit ' + e.name + ' session'} onClick=${() => openEntryEditor(e)}><${Icon} name="edit" size=${16} /></button></td>

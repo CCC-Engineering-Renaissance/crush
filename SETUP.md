@@ -20,6 +20,7 @@ Until step 2 is done, /portal shows a "opens soon" page and a demo with sample d
 | Google sign-in | Firebase Authentication | Free |
 | Hours, pages, tasks, events, members | Cloud Firestore (Spark plan) | Free: 50,000 reads and 20,000 writes a day, 1 GiB stored. A club of ~100 uses a small slice of that. No credit card needed. |
 | Files | Your existing Google Drive | Free |
+| Discord announcements bot (optional) | Google Apps Script, under the club Google account | Free |
 
 ---
 
@@ -104,14 +105,24 @@ Nobody can get admin rights from the website itself, so the first admin is set i
    files** on GitHub) and commit to `main`. GitHub Pages republishes in a minute or two.
 2. Open **engineeringrenaissance.org/portal** and click **Sign in with Google** with the email from
    step 5. You land in the portal as an admin.
-3. Go to **Admin**. Click **Add starter content** to create the four subteams, the clock-in
-   activities and the spaces (Club HQ, Crush Depth, Mechanical, Electrical & Software, Business, Media).
-   Rename or remove any of them later.
+3. Go to **Admin**. Click **Add starter content**. It creates Crush Depth and Prosthetic as
+   subsidiaries, with a subteam and a space for each of Crush Depth's Discord channels
+   (mate-club-mgmt and tech-leads start out private), a club-wide club-hq space, and the clock-in
+   activities. Prosthetic's three subteams (electrical, mechanical, signal-processing) are a guess,
+   so rename them to match its channels. Change any of it later under **Admin → Subsidiaries and
+   subteams** and **Admin → Spaces**.
+   If you tried the portal before this version and added starter content then, delete the
+   `subteams`, `activities`, `spaces`, `pages` and `tasks` collections in **Firestore → Data** first,
+   so the new set starts clean.
 4. **Admin → Settings:** set the term name, start and end dates, the hour goals, and the longest
    session allowed before a lead has to approve it (10 hours by default).
 5. **Admin → Invites:** paste the officers' emails with the **Lead** role. Invited people skip
    approval the first time they sign in. Everyone else signs in, fills out the join form, and an admin
    approves them under **Admin → Members**.
+6. **Private spaces.** A private space (lock icon in the sidebar) opens only for admins and the people
+   you add. Add people from the space (**Who can open it**, which can add a whole subteam at once) or
+   from the person (**Admin → Members → Manage → Private spaces they can open**). When you approve
+   someone, the private spaces tied to the subteams they picked are already ticked.
 
 The public site's **Get Involved** buttons and the **Member portal** link in the menu now lead here.
 
@@ -152,12 +163,96 @@ In **console.cloud.google.com** (same project):
 Files still follow Drive's own sharing. Keep team files in a shared Drive folder that club members can
 open, or the preview inside a page will ask them to request access.
 
+## 8. Post announcements from Discord (optional)
+
+Leads already announce things in Discord. With the portal bot in the server, a Discord post that
+mentions the bot is copied into the portal's **Announcements** too, so nobody posts twice:
+
+- `@ER Portal @Chassis Pool test moved to 10 AM` is posted for the Chassis subteam.
+- `@ER Portal @MATE Registration is due Friday` is posted for every Crush Depth subteam, once the MATE
+  role is linked to the Crush Depth subsidiary (step 8c).
+- `@ER Portal @everyone …`, or a post with no role, is for everyone.
+
+New posts appear within a minute. Editing the Discord post updates the announcement, and deleting it
+(or editing out the bot's mention) takes it down, within 10 minutes. The bot reacts ✅ when a post is
+on the portal, 🚫 when the person isn't allowed to post, and replies when a role isn't linked to a
+subteam yet. Only officers can post this way: people whose Discord roles can @everyone, manage messages
+or manage the server.
+
+In the portal, leads can pin a Discord post or hide it from members; edits happen in Discord.
+
+The bot is a Google Apps Script that runs under the club Google account every minute. There's no
+server to keep running and it's free.
+
+### 8a. Create the bot in Discord
+
+1. Go to **discord.com/developers/applications → New Application** and name it `ER Portal`. That's
+   the name people will @.
+2. **Bot:** click **Reset Token** and copy the token. Treat it like a password: anyone with it can act as
+   the bot. Turn off **Public Bot**. Under **Privileged Gateway Intents**, turn on **Message Content
+   Intent**, so the bot can read posts that mention its role as well as the bot itself.
+3. **OAuth2 → URL Generator:** tick `bot`, then under **Bot Permissions** tick **View Channels**,
+   **Read Message History**, **Add Reactions** and **Send Messages**. Open the URL it makes and add
+   the bot to the club's server.
+4. Your MATE channels are private, so let the bot into them: right-click the category →
+   **Edit Category → Permissions → Add members or roles → ER Portal**, allow **View Channel** and
+   **Read Message History**, and sync the channels. The bot only sees channels it's allowed into.
+
+### 8b. Set up the script (club Google account)
+
+1. Open **script.google.com → New project** and name it `ER portal Discord bot`.
+2. Replace everything in **Code.gs** with `discord-bot/Code.gs` from this repository.
+3. **Project Settings** (gear icon) → tick **Show "appsscript.json" manifest file in editor**. Open
+   `appsscript.json` in the editor and replace it with `discord-bot/appsscript.json`.
+4. **Project Settings → Script properties → Add script property:**
+   - `DISCORD_BOT_TOKEN`: the token from 8a.
+   - `FIREBASE_PROJECT_ID`: the Project ID from **Firebase → Project settings**, like `er-portal-19d4a`.
+5. In the editor, pick **setup** in the function menu and click **Run**. Google asks you to allow it:
+   choose the club account → **Advanced → Go to ER portal Discord bot (unsafe) → Allow**. It says
+   "unsafe" only because it's your own script that Google hasn't reviewed. The log lists the channels
+   the bot watches and which Discord roles go with which subteams.
+
+If the log says the Firestore API isn't turned on for this script's project, open **Project Settings
+→ Google Cloud Platform (GCP) Project → Change project**, enter the **Project number** from
+**Firebase → Project settings**, click **Set project**, and run **setup** again. If it says the account
+can't reach the database, run the script as the Google account that owns the Firebase project.
+
+### 8c. Link Discord roles to subteams
+
+In the portal, open **Admin → Subsidiaries and subteams** and fill in each subteam's **Discord role**
+with the role's name (like `Chassis`) or its ID. You can skip a subteam whose name matches a role
+exactly, unless two subteams share the name: Crush Depth and Prosthetic both have an Electrical, so
+link each to its own role. Fill in a subsidiary's **Discord role** (like `MATE`) to post for all its
+subteams at once. Run **checkSetup** in the script editor any time to see the current links.
+
+Optional script properties:
+
+| Property | What it does |
+|---|---|
+| `DISCORD_CHANNELS` | Only watch these channels (names or IDs, separated by commas). |
+| `POSTER_ROLES` | Only these roles (and server admins) can post through the bot. |
+| `DISCORD_GUILD_ID` | Which server to use, if the bot is in more than one. |
+
+To turn the bot off, run **stop** in the script editor. Good to know:
+
+- Every member can read every announcement. The @role decides who it's for and powers the **Only for
+  my subteams** filter; it doesn't hide the post from anyone.
+- Images and files stay in Discord. The announcement says how many there are and links to the post.
+- Posts in threads and forum channels aren't picked up. Post in a regular channel.
+- Posts from before you ran setup aren't copied.
+
 ---
 
 ## How the portal keeps things secure
 
 - **Only approved members see anything.** A new Google account can only ask to join. Until an admin
   approves it, it sees its own request and nothing else.
+- **Private spaces stay private.** The rules check every page, task and page list against the people
+  an admin added, and nobody can add themselves. Signed-in members can see a private space's name
+  and description, but not its pages, tasks or Drive folder.
+- **The Discord bot holds no keys to the database.** It runs as the club Google account, which already
+  owns the Firebase project, and its Discord token lives in the script's properties, which only that
+  account can see. It only acts on posts from officers.
 - **The rules run on Google's servers.** The website's code is public, so every permission lives in
   `firebase/firestore.rules`, which Firestore checks on every read and write. Changing the website's
   JavaScript can't get around it.
@@ -205,6 +300,8 @@ open, or the preview inside a page will ask them to request access.
 | "You don't have permission to do that" | The rules in step 4.2 weren't published, or the person's role doesn't allow it. |
 | Drive picker says "API developer key is invalid" | Add `https://docs.google.com/*` to the picker key's website list (step 7.4). |
 | A Google feature stops loading | Open the browser console. A "Content Security Policy" message names the blocked address; add it to the matching line at the top of `portal/index.html`. |
+| A Discord post that mentions the bot gets no ✅ | Check that the bot can see that channel (step 8a.4) and that the post mentions the bot itself, not just its name in text. The script's **Executions** page at script.google.com shows each run and any error. |
+| The bot replied that a role isn't linked | Link the role to a subteam (step 8c), then edit the Discord post. It goes up within 10 minutes. |
 | Everything says "Quota exceeded" | Over the free daily limit; it resets at midnight Pacific time. If it happens often, upgrade the Firebase project to the Blaze plan, where the same usage costs cents. |
 
 ## For developers
@@ -217,8 +314,17 @@ open, or the preview inside a page will ask them to request access.
 - **Libraries** (Firebase, Preact + htm, DOMPurify, Editor.js) and fonts are bundled into
   `portal/vendor` and `portal/assets/fonts` so the site loads nothing from outside CDNs. To upgrade
   one: `cd portal/tools && npm install && npm run vendor`.
-- **Rules tests:** `cd firebase && npm install && npm test` (needs Java 11+ for the Firestore
-  emulator). Run them after any change to `firestore.rules`.
+- **Rules tests:** `cd firebase && npm install && npm test` (needs Java 21+ for the Firestore
+  emulator). Run them after any change to `firestore.rules`. GitHub runs them too, along with the
+  Discord bot's tests, whenever `firebase/` or `discord-bot/` changes: see the **Actions** tab
+  (`.github/workflows/portal-checks.yml`).
+- **Discord bot:** `discord-bot/Code.gs` is the whole bot. `node --test discord-bot/bot.test.mjs`
+  runs it against a pretend Discord server and database. After changing it, paste it into the Apps
+  Script project again.
+- **Spaces:** `spaces/{id}` holds a space's name, subsidiary and whether it's private; its page list
+  and Drive folder are in `spaceContent/{id}` and its tasks in `spaces/{id}/tasks`, so the rules can
+  check access by the space id in the path. `users/{uid}.spaces` lists the private spaces someone can
+  open.
 - **Deploying rules from the command line** instead of pasting them: copy
   `firebase/.firebaserc.example` to `firebase/.firebaserc`, set your project ID, then
   `npx firebase login` and `npm run deploy:rules`.

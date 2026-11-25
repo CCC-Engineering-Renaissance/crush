@@ -1,6 +1,6 @@
 // Calendar: meetings, build days, pool tests, competitions and outreach.
 import { html, useState, useMemo, Icon, Modal, openModal, Field, Seg, Chip, Loading, Empty, useAsync, toast, toastError, confirmDialog } from '../lib/ui.js';
-import { useStore, isLead, subteamById, bump } from '../lib/store.js';
+import { useStore, isLead, subteamById, subteamLabel, bump } from '../lib/store.js';
 import {
   startOfDay, addDays, startOfWeek, startOfMonth, addMonths, isoDate, parseIsoDate, sameDay, fmtDate, fmtTime, fmtMonth, combine, timeInput,
 } from '../lib/time.js';
@@ -8,7 +8,7 @@ import { Markdown } from '../lib/text.js';
 import { downloadText } from '../lib/csv.js';
 import { seriesColor } from './charts.js';
 import { DateBlock } from './home.js';
-import { useTitle } from './common.js';
+import { useTitle, SubteamPicker } from './common.js';
 
 export const EVENT_TYPES = {
   meeting: ['Meeting', 'navy'], build: ['Build day', 'lime'], pool: ['Pool test', 'sky'], competition: ['Competition', 'magenta'],
@@ -121,7 +121,7 @@ function EventDetail({ e, close }) {
       <a class="btn btn-primary" href=${gcalLink(e)} target="_blank" rel="noopener noreferrer"><${Icon} name="calendar" />Add to Google Calendar</a>`}>
     <div class="stack" style="gap:10px">
       <div class="row wrap" style="gap:8px"><span class="chip"><i style=${{ background: typeColor(e.type) }}></i>${(EVENT_TYPES[e.type] || EVENT_TYPES.other)[0]}</span>
-        ${(e.subteams || []).map((id) => subteamById(id) && html`<${Chip} key=${id} color=${seriesColor(subteamById(id).color)}>${subteamById(id).name}</${Chip}>`)}</div>
+        ${(e.subteams || []).map((id) => subteamById(id) && html`<${Chip} key=${id} color=${seriesColor(subteamById(id).color)}>${subteamLabel(id)}</${Chip}>`)}</div>
       <div class="row"><${Icon} name="clock" size=${18} /><span>${fmtDate(e.start)}, ${fmtTime(e.start)} – ${fmtTime(e.end)}</span></div>
       ${e.location && html`<div class="row"><${Icon} name="mapPin" size=${18} /><span>${e.location}</span></div>`}
       ${e.description && html`<${Markdown} text=${e.description} />`}
@@ -176,8 +176,7 @@ function EventEditor({ e, close }) {
       <${Field} label="Ends"><input class="input" type="time" value=${f.end} onInput=${set('end')} /></${Field}>
       <${Field} label="Location" full><input class="input" value=${f.location} maxlength="140" onInput=${set('location')} placeholder="Room or place" /></${Field}>
       <${Field} label="Details (optional)" full hint="Supports **bold**, *italic*, links and - lists."><textarea class="textarea" value=${f.description} maxlength="4000" onInput=${set('description')}></textarea></${Field}>
-      <div class="field full"><span>For subteams (optional)</span><div class="chips">${subteams.map((s) => html`<button type="button" key=${s.id} class="chip chip-toggle" aria-pressed=${String(f.subteams.includes(s.id))}
-        onClick=${() => setF({ ...f, subteams: f.subteams.includes(s.id) ? f.subteams.filter((x) => x !== s.id) : [...f.subteams, s.id] })}>${s.name}</button>`)}</div></div>
+      <div class="field full"><span>For subteams (optional)</span><${SubteamPicker} value=${f.subteams} onChange=${(v) => setF({ ...f, subteams: v })} /></div>
       ${!e && html`<${Field} label="Repeat weekly until (optional)" hint="Creates one event per week, same day and time."><input class="input" type="date" value=${f.repeatUntil} min=${f.date} onInput=${set('repeatUntil')} /></${Field}>`}
     </div>
     ${err && html`<p class="form-error" role="alert">${err}</p>`}

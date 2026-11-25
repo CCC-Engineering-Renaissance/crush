@@ -1,6 +1,6 @@
 // My time (every member) and Approvals (leads).
 import { html, useState, useMemo, Icon, Avatar, Modal, openModal, Field, Seg, Menu, StatusBadge, Chip, Loading, Empty, Notice, useAsync, toast, toastError, confirmDialog } from '../lib/ui.js';
-import { useStore, setState, getState, isLead, isAdmin, activityById, subteamById, bump } from '../lib/store.js';
+import { useStore, setState, getState, isLead, isAdmin, activityById, subteamById, subteamLabel, bump } from '../lib/store.js';
 import { href } from '../lib/router.js';
 import {
   presetRange, startOfDay, addDays, isoDate, parseIsoDate, fmtDate, fmtTime, fmtRange, fmtDuration, fmtHours, hours, entryMs,
@@ -62,7 +62,7 @@ function MySessions() {
 
   const exportCsv = () => downloadCsv(`my-hours-${isoDate(range.from)}-to-${isoDate(addDays(range.to, -1))}.csv`, [
     ['Date', 'Start', 'End', 'Hours', 'Status', 'Activity', 'Subteam', 'Note', 'What I got done'],
-    ...entries.map((e) => [isoDate(e.start), fmtTime(e.start), e.end ? fmtTime(e.end) : '', fmtHours(hours(entryMs(e)), 2), e.status, activityById(e.activityId)?.name || '', subteamById(e.subteamId)?.name || '', e.note || '', e.outNote || '']),
+    ...entries.map((e) => [isoDate(e.start), fmtTime(e.start), e.end ? fmtTime(e.end) : '', fmtHours(hours(entryMs(e)), 2), e.status, activityById(e.activityId)?.name || '', subteamLabel(e.subteamId), e.note || '', e.outNote || '']),
   ]);
 
   return html`
@@ -137,7 +137,7 @@ function SessionRow({ e }) {
         ${e.status !== 'complete' && html`<${StatusBadge} status=${e.status} />`}
         ${e.geo === 'off-site' && html`<span class="badge badge-plain" title="Clocked in away from the lab"><${Icon} name="mapPin" size=${12} />Away from lab</span>`}
         ${e.source === 'lead' && html`<span class="badge badge-plain">Added by a lead</span>`}</div>
-      <div class="meta">${act ? act.name : 'No activity'}${sub ? html` <${Chip} color=${seriesColor(sub.color)}>${sub.name}</${Chip}>` : ''}</div>
+      <div class="meta">${act ? act.name : 'No activity'}${sub ? html` <${Chip} color=${seriesColor(sub.color)}>${subteamLabel(sub)}</${Chip}>` : ''}</div>
       ${e.note && html`<div class="small" style="margin-top:4px">${e.note}</div>`}
       ${e.outNote && html`<div class="small" style="margin-top:4px;color:var(--text-2)">Got done: ${e.outNote}</div>`}
       ${e.fix?.reason && html`<div class="small" style="margin-top:4px;color:var(--text-2)">Your fix note: ${e.fix.reason}</div>`}

@@ -38,6 +38,7 @@ export function createFirebaseBackend(config) {
 
   const col = (name) => collection(db, name);
   const ref = (name, id) => doc(db, name, id);
+  const taskCol = (spaceId) => collection(db, 'spaces', spaceId, 'tasks');
   const watch = (q, cb, onErr, single = false) => onSnapshot(q,
     (s) => cb(single ? (s.exists() ? fromSnap(s) : null) : list(s)),
     (e) => { console.error(e); onErr && onErr(e); });
@@ -83,6 +84,15 @@ export function createFirebaseBackend(config) {
     watchPendingMembers: (cb, onErr) => watch(query(col('users'), where('status', '==', 'pending')), cb, onErr),
     adminUpdateUser: (uid, patch) => updateDoc(ref('users', uid), patch),
     adminDeleteUser: (uid) => deleteDoc(ref('users', uid)),
+    // Admins let people into private spaces: users/{uid}.spaces lists the ones they can open.
+    async setSpaceAccess(changes) {
+      const entries = Object.entries(changes); // [uid, spaces[]]
+      for (let i = 0; i < entries.length; i += CHUNK) {
+        const batch = writeBatch(db);
+        entries.slice(i, i + CHUNK).forEach(([uid, spaces]) => batch.update(ref('users', uid), { spaces }));
+        await batch.commit();
+      }
+    },
     async listInvites() { return list(await getDocs(col('invites'))); },
     saveInvite: (inv, me) => setDoc(ref('invites', inv.email.toLowerCase()), {
       email: inv.email.toLowerCase(), role: inv.role, subteams: inv.subteams || [], title: inv.title || '',
@@ -94,9 +104,9 @@ export function createFirebaseBackend(config) {
     watchSettings: (cb, onErr) => watch(ref('config', 'settings'), cb, onErr, true),
     saveSettings: (data) => setDoc(ref('config', 'settings'), data, { merge: true }),
     watchRefs(cb, onErr) {
-      const cur = { subteams: null, activities: null, spaces: null };
-      const emit = () => { if (cur.subteams && cur.activities && cur.spaces) cb({ ...cur }); };
-      const u = ['subteams', 'activities', 'spaces'].map((name) => watch(col(name), (rows) => { cur[name] = rows; emit(); }, onErr));
+      const cur = { subteams: null, activities: null, spaces: null, subsidiaries: null };
+      const emit = () => { if (Object.values(cur).every(Boolean)) cb({ ...cur }); };
+      const u = Object.keys(cur).map((name) => watch(col(name), (rows) => { cur[name] = rows; emit(); }, onErr));
       return () => u.forEach((f) => f());
     },
     async saveRef(coll, item) {
@@ -106,6 +116,7 @@ export function createFirebaseBackend(config) {
     },
     deleteRef: (coll, id) => deleteDoc(ref(coll, id)),
     async listSubteams() { return list(await getDocs(col('subteams'))); },
+    async listSubsidiaries() { return list(await getDocs(col('subsidiaries'))); },
     // First-run starter content, written with fixed ids so the join form's choices line up.
     async seedStarter(seed) {
       const writes = Object.entries(seed).flatMap(([coll, items]) => Object.entries(items).map(([id, data]) => [ref(coll, id), data]));
@@ -212,13 +223,27 @@ export function createFirebaseBackend(config) {
     },
     deleteAnnouncement: (id) => deleteDoc(ref('announcements', id)),
 
+    // ── Spaces ──
+    // spaces/{id} holds the name, group and who can open it; spaceContent/{id} holds the page
+    // outline and Drive folder, which only people who can open the space may read.
+    watchSpaceContent: (spaceId, cb, onErr) => watch(ref('spaceContent', spaceId), cb, onErr, true),
+    async createSpace(meta, content = {}) {
+      const r = doc(col('spaces'));
+      const batch = writeBatch(db);
+      batch.set(r, { ...meta, updatedAt: serverTimestamp() });
+      batch.set(ref('spaceContent', r.id), { tree: [], driveFolder: content.driveFolder || null, updatedAt: serverTimestamp() });
+      await batch.commit();
+      return r.id;
+    },
+    saveSpaceContent: (spaceId, patch) => setDoc(ref('spaceContent', spaceId), { ...patch, updatedAt: serverTimestamp() }, { merge: true }),
+
     // ── Pages ──
     watchPage: (id, cb, onErr) => watch(ref('pages', id), cb, onErr, true),
     async createPage(spaceId, { title, icon = '📄', parentId = null }, me) {
       const pageRef = doc(col('pages'));
       await runTransaction(db, async (tx) => {
-        const sp = await tx.get(ref('spaces', spaceId));
-        const tree = (sp.data()?.tree || []).slice();
+        const cs = await tx.get(ref('spaceContent', spaceId));
+        const tree = (cs.data()?.tree || []).slice();
         const siblings = tree.filter((n) => (n.parentId || null) === parentId);
         const order = siblings.reduce((m, n) => Math.max(m, n.order || 0), 0) + 1;
         tree.push({ id: pageRef.id, title, icon, parentId, order });
@@ -227,7 +252,8 @@ export function createFirebaseBackend(config) {
           createdBy: me.uid, createdByName: me.name, createdAt: serverTimestamp(),
           updatedBy: me.uid, updatedByName: me.name, updatedAt: serverTimestamp(),
         });
-        tx.update(ref('spaces', spaceId), { tree, updatedAt: serverTimestamp() });
+        if (cs.exists()) tx.update(ref('spaceContent', spaceId), { tree, updatedAt: serverTimestamp() });
+        else tx.set(ref('spaceContent', spaceId), { tree, driveFolder: null, updatedAt: serverTimestamp() });
       });
       return pageRef.id;
     },
@@ -245,18 +271,18 @@ export function createFirebaseBackend(config) {
     async updatePageMeta(page, patch, me) {
       return runTransaction(db, async (tx) => {
         const ps = await tx.get(ref('pages', page.id));
-        const ss = await tx.get(ref('spaces', page.spaceId));
+        const cs = await tx.get(ref('spaceContent', page.spaceId));
         const cur = ps.data();
         const rev = (cur.rev || 0) + 1;
-        const tree = (ss.data()?.tree || []).map((n) => (n.id === page.id ? { ...n, ...pick(patch, ['title', 'icon', 'parentId', 'order']) } : n));
+        const tree = (cs.data()?.tree || []).map((n) => (n.id === page.id ? { ...n, ...pick(patch, ['title', 'icon', 'parentId', 'order']) } : n));
         tx.update(ref('pages', page.id), { ...patch, rev, updatedBy: me.uid, updatedByName: me.name, updatedAt: serverTimestamp() });
-        tx.update(ref('spaces', page.spaceId), { tree, updatedAt: serverTimestamp() });
+        if (cs.exists()) tx.update(ref('spaceContent', page.spaceId), { tree, updatedAt: serverTimestamp() });
         return rev;
       });
     },
     async deletePage(page) {
-      const ss = await getDoc(ref('spaces', page.spaceId));
-      const doomed = descendants(ss.data()?.tree || [], page.id);
+      const cs = await getDoc(ref('spaceContent', page.spaceId));
+      const doomed = descendants(cs.data()?.tree || [], page.id);
       // Children first, in small batches; then take them all out of the outline.
       for (let i = doomed.length; i > 0; i -= CHUNK) {
         const batch = writeBatch(db);
@@ -264,18 +290,19 @@ export function createFirebaseBackend(config) {
         await batch.commit();
       }
       await runTransaction(db, async (tx) => {
-        const cur = await tx.get(ref('spaces', page.spaceId));
+        const cur = await tx.get(ref('spaceContent', page.spaceId));
         const tree = cur.data()?.tree || [];
-        tx.update(ref('spaces', page.spaceId), { tree: tree.filter((n) => !doomed.includes(n.id)), updatedAt: serverTimestamp() });
+        if (cur.exists()) tx.update(ref('spaceContent', page.spaceId), { tree: tree.filter((n) => !doomed.includes(n.id)), updatedAt: serverTimestamp() });
       });
     },
-    // Deletes a space with its pages and tasks (admins only).
+    // Deletes a space with its pages, tasks and outline (admins only). The space itself goes last,
+    // because the rules for its tasks look it up.
     async deleteSpace(spaceId) {
       const [pages, tasks] = await Promise.all([
         getDocs(query(col('pages'), where('spaceId', '==', spaceId))),
-        getDocs(query(col('tasks'), where('spaceId', '==', spaceId))),
+        getDocs(taskCol(spaceId)),
       ]);
-      const refs = [...pages.docs.map((d) => d.ref), ...tasks.docs.map((d) => d.ref), ref('spaces', spaceId)];
+      const refs = [...pages.docs.map((d) => d.ref), ...tasks.docs.map((d) => d.ref), ref('spaceContent', spaceId), ref('spaces', spaceId)];
       for (let i = 0; i < refs.length; i += CHUNK) {
         const batch = writeBatch(db);
         refs.slice(i, i + CHUNK).forEach((r) => batch.delete(r));
@@ -285,23 +312,29 @@ export function createFirebaseBackend(config) {
     async rebuildTree(spaceId) {
       const pages = list(await getDocs(query(col('pages'), where('spaceId', '==', spaceId))));
       const tree = pages.map((p) => ({ id: p.id, title: p.title, icon: p.icon || '📄', parentId: p.parentId || null, order: p.order || 0 }));
-      await updateDoc(ref('spaces', spaceId), { tree, updatedAt: serverTimestamp() });
+      await setDoc(ref('spaceContent', spaceId), { tree, updatedAt: serverTimestamp() }, { merge: true });
       return tree.length;
     },
 
-    // ── Tasks ──
-    watchTasks: (spaceId, cb, onErr) => watch(query(col('tasks'), where('spaceId', '==', spaceId)), cb, onErr),
-    async listMyTasks(uid) { return list(await getDocs(query(col('tasks'), where('assignees', 'array-contains', uid), limit(100)))); },
+    // ── Tasks: spaces/{spaceId}/tasks ──
+    watchTasks: (spaceId, cb, onErr) => watch(taskCol(spaceId), cb, onErr),
+    // One small query per space the person can open; the rules check each space by its path.
+    async listMyTasks(uid, spaceIds = []) {
+      const lists = await Promise.all(spaceIds.map((sid) => getDocs(query(taskCol(sid), where('assignees', 'array-contains', uid), limit(100)))
+        .then(list).catch((e) => { console.warn('Tasks skipped for', sid, e); return []; })));
+      return lists.flat();
+    },
     async saveTask(task, me, { assigneeOnly = false } = {}) {
-      const { id, ...data } = task;
+      const { id, spaceId, ...data } = task;
+      if (!spaceId) throw new Error('A task needs its space.');
       if (id) {
         const patch = assigneeOnly ? pick(data, ['status', 'order', 'completedAt']) : data;
-        return updateDoc(ref('tasks', id), { ...patch, updatedAt: serverTimestamp() });
+        return updateDoc(doc(db, 'spaces', spaceId, 'tasks', id), { ...patch, updatedAt: serverTimestamp() });
       }
-      const r = await addDoc(col('tasks'), { ...data, createdBy: me.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      const r = await addDoc(taskCol(spaceId), { ...data, spaceId, createdBy: me.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       return r.id;
     },
-    deleteTask: (id) => deleteDoc(ref('tasks', id)),
+    deleteTask: (task) => deleteDoc(doc(db, 'spaces', task.spaceId, 'tasks', task.id)),
 
     // ── Audit log (leads and admins) ──
     async log(me, action, summary, target = {}) {

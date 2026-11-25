@@ -1,0 +1,42 @@
+# Runs the member portal's security-rule tests and the Discord bot's tests whenever either changes.
+# Results show in the repository's Actions tab. Nothing here deploys anything.
+name: Portal checks
+
+on:
+  push:
+    paths: ['firebase/**', 'discord-bot/**', '.github/workflows/portal-checks.yml']
+  pull_request:
+    paths: ['firebase/**', 'discord-bot/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firestore-rules:
+    name: Firestore security rules
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firebase
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+
+  discord-bot:
+    name: Discord bot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - run: node --test discord-bot/bot.test.mjs

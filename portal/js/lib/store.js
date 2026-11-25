@@ -23,6 +23,8 @@ const state = {
   subteams: [],
   activities: [],
   spaces: [],
+  subsidiaries: [],     // Crush Depth, Prosthetic…: groups of subteams and spaces
+  contents: {},         // spaceId -> { tree, driveFolder } for the spaces this person can open
   presence: [],
   pendingFixes: [],
   pendingMembers: [],
@@ -80,3 +82,31 @@ export const isAdmin = (p = state.profile) => !!p && p.status === 'active' && p.
 export const subteamById = (id) => state.subteams.find((s) => s.id === id);
 export const activityById = (id) => state.activities.find((a) => a.id === id);
 export const spaceById = (id) => state.spaces.find((s) => s.id === id);
+export const subsidiaryById = (id) => state.subsidiaries.find((s) => s.id === id);
+
+// Who can open a space. Mirrors canSeeSpace() in firebase/firestore.rules, which is what
+// actually protects private spaces; this only decides what to show.
+export const canSeeSpace = (space, p = state.profile) => !!space && !!p && p.status === 'active'
+  && (p.role === 'admin' || !space.private || (p.spaces || []).includes(space.id));
+export const visibleSpaces = (s = state) => s.spaces.filter((sp) => canSeeSpace(sp, s.profile));
+const NO_PAGES = [];
+export const treeOf = (spaceId, s = state) => s.contents[spaceId]?.tree || NO_PAGES;
+
+// Subsidiaries first by their order; things that belong to none come first as "club-wide".
+export function groupBySubsidiary(items, subs = state.subsidiaries) {
+  const known = new Set(subs.map((x) => x.id));
+  return [
+    { sub: null, items: items.filter((x) => !known.has(x.subsidiaryId)) },
+    ...subs.map((sub) => ({ sub, items: items.filter((x) => x.subsidiaryId === sub.id) })),
+  ];
+}
+
+// "Electrical" when it's the only one; "Electrical (Prosthetic)" when two subsidiaries both have one.
+const same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+function qualified(item, all) {
+  if (!item) return '';
+  const twin = all.some((o) => o.id !== item.id && same(o.name, item.name));
+  return twin ? `${item.name} (${subsidiaryById(item.subsidiaryId)?.name || 'Club'})` : item.name;
+}
+export const subteamLabel = (idOrTeam) => qualified(typeof idOrTeam === 'string' ? subteamById(idOrTeam) : idOrTeam, state.subteams);
+export const spaceLabel = (idOrSpace) => qualified(typeof idOrSpace === 'string' ? spaceById(idOrSpace) : idOrSpace, state.spaces);

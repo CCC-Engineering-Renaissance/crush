@@ -1,12 +1,12 @@
 // Member directory, profiles, and editing your own profile.
 import { html, useState, useMemo, useEffect, Icon, Avatar, Chip, Field, Seg, Loading, Empty, Notice, StatusBadge, useAsync, toast, toastError } from '../lib/ui.js';
-import { useStore, setState, getState, isLead, isAdmin, subteamById, activityById } from '../lib/store.js';
+import { useStore, setState, getState, isLead, isAdmin, subteamById, subteamLabel, activityById, groupBySubsidiary } from '../lib/store.js';
 import { href, go } from '../lib/router.js';
 import { termRange, startOfWeek, addDays, startOfDay, entryMs, hours, fmtHours, fmtDate, fmtRange, fmtDuration, relTime } from '../lib/time.js';
 import { seriesColor } from './charts.js';
 import { openEntryEditor } from './time.js';
 import { openMemberManager } from './admin.js';
-import { setTheme, useTitle } from './common.js';
+import { setTheme, useTitle, SubteamPicker } from './common.js';
 
 const ROLE = { admin: 'Admin', lead: 'Lead', member: 'Member' };
 
@@ -22,7 +22,7 @@ function useMemberList(includeAll) {
 
 export function Members() {
   useTitle('Members');
-  const { api, profile, subteams, settings } = useStore((s) => ({ api: s.api, profile: s.profile, subteams: s.subteams, settings: s.settings }));
+  const { api, profile, subteams, subsidiaries, settings } = useStore((s) => ({ api: s.api, profile: s.profile, subteams: s.subteams, subsidiaries: s.subsidiaries, settings: s.settings }));
   const lead = isLead(profile);
   const res = useMemberList(false);
   const [q, setQ] = useState('');
@@ -51,7 +51,9 @@ export function Members() {
     <div class="row wrap" style="gap:10px;margin-bottom:16px">
       <div class="search" style="flex:1;min-width:220px"><${Icon} name="search" /><input class="input" type="search" placeholder="Search names, skills, majors" value=${q} onInput=${(e) => setQ(e.target.value)} /></div>
       <select class="select" style="width:auto" value=${sub} onChange=${(e) => setSub(e.target.value)} aria-label="Subteam">
-        <option value="all">All subteams</option>${subteams.map((s) => html`<option value=${s.id} key=${s.id}>${s.name}</option>`)}</select>
+        <option value="all">All subteams</option>${groupBySubsidiary(subteams, subsidiaries).filter((g) => g.items.length).map((g) => (g.sub
+          ? html`<optgroup label=${g.sub.name} key=${g.sub.id}>${g.items.map((s) => html`<option value=${s.id} key=${s.id}>${s.name}</option>`)}</optgroup>`
+          : g.items.map((s) => html`<option value=${s.id} key=${s.id}>${s.name}</option>`)))}</select>
       <label class="check small"><input type="checkbox" checked=${officers} onChange=${(e) => setOfficers(e.target.checked)} />Officers and leads only</label>
     </div>
     ${res.loading && !res.data ? html`<${Loading} />` : !list.length ? html`<div class="panel"><${Empty} title="Nobody matches">Try a different search or subteam.</${Empty}></div>`
@@ -59,7 +61,7 @@ export function Members() {
         <${Avatar} person=${m} size=${40} />
         <span class="grow"><a class="title" href=${href('/members/' + m.uid)}>${m.name}</a>${m.pronouns && html` <span class="small muted">(${m.pronouns})</span>`}
           <div class="meta">${m.title || (m.role !== 'member' ? ROLE[m.role] : m.major || 'Member')}</div></span>
-        <span class="chips" style="justify-content:flex-end">${(m.subteams || []).map((id) => subteamById(id) && html`<${Chip} key=${id} color=${seriesColor(subteamById(id).color)}>${subteamById(id).name}</${Chip}>`)}</span>
+        <span class="chips" style="justify-content:flex-end">${(m.subteams || []).map((id) => subteamById(id) && html`<${Chip} key=${id} color=${seriesColor(subteamById(id).color)}>${subteamLabel(id)}</${Chip}>`)}</span>
         ${termHours && html`<span class="num" style="min-width:64px;text-align:right">${fmtHours(hours(termHours.get(m.uid) || 0))} h</span>`}
       </li>`)}</ul></div>`}
   </div>`;
@@ -92,7 +94,7 @@ export function MemberProfile({ uid }) {
           <div class="muted" style="margin-top:2px">${m.title || ROLE[m.role]}${m.major ? `, ${m.major}` : ''}</div>
           <div class="chips" style="margin-top:10px">${m.role !== 'member' && html`<span class="badge badge-info">${ROLE[m.role]}</span>`}
             ${m.status !== 'active' && html`<span class="badge badge-warn">${m.status}</span>`}
-            ${(m.subteams || []).map((id) => subteamById(id) && html`<${Chip} key=${id} color=${seriesColor(subteamById(id).color)}>${subteamById(id).name}</${Chip}>`)}</div>
+            ${(m.subteams || []).map((id) => subteamById(id) && html`<${Chip} key=${id} color=${seriesColor(subteamById(id).color)}>${subteamLabel(id)}</${Chip}>`)}</div>
           <div class="row wrap" style="gap:8px;margin-top:14px">
             <a class="btn btn-sm" href=${'mailto:' + m.email}><${Icon} name="mail" />${m.email}</a>
             ${links.linkedin && html`<a class="btn btn-sm" href=${links.linkedin} target="_blank" rel="noopener noreferrer"><${Icon} name="external" />LinkedIn</a>`}
@@ -174,8 +176,7 @@ export function EditProfile() {
         <${Field} label="Major" full><input class="input" value=${f.major} maxlength="80" onInput=${set('major')} /></${Field}>
         <${Field} label="About you" full><textarea class="textarea" value=${f.bio} maxlength="1000" onInput=${set('bio')} placeholder="What you work on, what you want to learn"></textarea></${Field}>
         <${Field} label="Skills" full hint="Separate with commas: SolidWorks, Arduino, Python"><input class="input" value=${f.skills} onInput=${set('skills')} /></${Field}>
-        <div class="field full"><span>Subteams</span><div class="chips">${subteams.map((s) => html`<button type="button" key=${s.id} class="chip chip-toggle" aria-pressed=${String(f.subteams.includes(s.id))}
-          onClick=${() => setF({ ...f, subteams: f.subteams.includes(s.id) ? f.subteams.filter((x) => x !== s.id) : [...f.subteams, s.id] })}>${s.name}</button>`)}</div></div>
+        <div class="field full"><span>Subteams</span><${SubteamPicker} value=${f.subteams} onChange=${(v) => setF({ ...f, subteams: v })} /></div>
         <${Field} label="LinkedIn"><input class="input" type="url" value=${f.linkedin} placeholder="https://linkedin.com/in/…" onInput=${set('linkedin')} /></${Field}>
         <${Field} label="GitHub"><input class="input" type="url" value=${f.github} placeholder="https://github.com/…" onInput=${set('github')} /></${Field}>
         <${Field} label="Website or portfolio" full><input class="input" type="url" value=${f.website} placeholder="https://…" onInput=${set('website')} /></${Field}>

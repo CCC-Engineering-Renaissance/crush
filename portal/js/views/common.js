@@ -1,6 +1,6 @@
 // Pieces shared across screens: depth-contour artwork, the demo bar, theme handling.
-import { html, useState, useEffect } from '../lib/ui.js';
-import { useStore, setState } from '../lib/store.js';
+import { html, useState, useEffect, Icon } from '../lib/ui.js';
+import { useStore, setState, groupBySubsidiary } from '../lib/store.js';
 
 // Bathymetric contour lines, like a chart of the sea floor around a seamount.
 function ringPath(cx, cy, r, k) {
@@ -79,4 +79,30 @@ export function setTheme(pref) {
 
 export function useTitle(title) {
   useEffect(() => { document.title = title ? `${title} — ER Portal` : 'Member Portal — Engineering Renaissance'; }, [title]);
+}
+
+// Subteam chips grouped under their subsidiary, so Crush Depth's "Electrical" and Prosthetic's
+// "Electrical" can't be mixed up. Pass `everyone` to add an "Everyone" chip that clears the choice.
+export function SubteamPicker({ value = [], onChange, subteams, subsidiaries, everyone }) {
+  const store = useStore((s) => ({ subteams: s.subteams, subsidiaries: s.subsidiaries }));
+  const groups = groupBySubsidiary(subteams || store.subteams, subsidiaries || store.subsidiaries).filter((g) => g.items.length);
+  const named = groups.some((g) => g.sub);
+  const toggle = (id) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
+  return html`<div class="pick-groups">
+    ${everyone && html`<div class="chips"><button type="button" class="chip chip-toggle" aria-pressed=${String(!value.length)} onClick=${() => onChange([])}>${everyone}</button></div>`}
+    ${groups.map((g) => {
+      const name = g.sub?.name || 'Club-wide';
+      return html`<div class="pick-group" key=${g.sub?.id || '-'} role=${named ? 'group' : undefined} aria-label=${named ? `${name} subteams` : undefined}>
+        ${named && html`<span class="pick-group-name" aria-hidden="true">${name}</span>`}
+        <div class="chips">${g.items.map((t) => html`<button type="button" key=${t.id} class="chip chip-toggle" aria-pressed=${String(value.includes(t.id))}
+          aria-label=${named ? `${t.name}, ${name}` : undefined} onClick=${() => toggle(t.id)}>${t.name}</button>`)}</div>
+      </div>`;
+    })}
+    ${!groups.length && html`<p class="small muted" style="margin:0">No subteams yet.</p>`}
+  </div>`;
+}
+
+// The space icon: a hash like a chat channel, with a lock when only chosen people can open it.
+export function SpaceIcon({ space, size = 18 }) {
+  return html`<${Icon} name=${space?.private ? 'hashLock' : 'hash'} size=${size} />`;
 }

@@ -48,6 +48,12 @@ const P = {
   history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>',
   filter: '<path d="M4 5h16l-6 8v5l-4 2v-7z"/>',
   key: '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M17 6l2 2M15 8l2 2"/>',
+  // Spaces read like chat channels: a hash, with a small lock for private ones.
+  hash: '<path d="M5 9h14.5M4.5 15h14.5M10.5 4 8.5 20M15.5 4l-2 16"/>',
+  hashLock: '<path d="M3 11h9.5M2.5 16.5h9.5M7.6 7 6.2 21M11.8 10.5l-1.1 10.5"/><rect x="14" y="7" width="8.5" height="6.5" rx="1.4"/><path d="M15.9 7V5.3a2.35 2.35 0 0 1 4.7 0V7"/>',
+  chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/>',
+  eyeOff: '<path d="M3 3l18 18"/><path d="M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 8.5 4.5 9.5 6a17 17 0 0 1-2.8 3.4M6.2 7.6A17 17 0 0 0 2.5 12c1 1.5 4.5 6 9.5 6 1.5 0 2.9-.4 4.1-1"/><path d="M9.9 10a3 3 0 0 0 4.1 4.2"/>',
+  eye: '<path d="M2.5 12C3.5 10.5 7 6 12 6s8.5 4.5 9.5 6c-1 1.5-4.5 6-9.5 6s-8.5-4.5-9.5-6z"/><circle cx="12" cy="12" r="3"/>',
 };
 
 export function Icon({ name, size, label, style }) {

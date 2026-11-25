@@ -3,7 +3,7 @@
 import { buildSeed, PERSONAS, VISITOR } from './demo-seed.js';
 import { descendants } from './tree.js';
 
-const KEY = 'er-portal-demo-v2';
+const KEY = 'er-portal-demo-v3';
 const PERSONA_KEY = 'er-portal-demo-persona';
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
@@ -81,16 +81,18 @@ export function createDemoBackend() {
     watchPendingMembers: (cb) => watch(['users'], () => rows('users').filter((u) => u.status === 'pending'), cb),
     async adminUpdateUser(id, p) { await wait(); patch('users', id, p); emit('users'); },
     async adminDeleteUser(id) { await wait(); delete coll('users')[id]; emit('users'); },
+    async setSpaceAccess(changes) { await wait(); for (const [id, spaces] of Object.entries(changes)) patch('users', id, { spaces }); emit('users'); },
     async listInvites() { await wait(); return rows('invites'); },
     async saveInvite(inv, me) { await wait(); put('invites', inv.email.toLowerCase(), { email: inv.email.toLowerCase(), role: inv.role, subteams: inv.subteams || [], title: inv.title || '', invitedBy: me.uid, invitedByName: me.name, createdAt: new Date() }); emit('invites'); },
     async deleteInvite(email) { await wait(); delete coll('invites')[email.toLowerCase()]; emit('invites'); },
 
     watchSettings: (cb) => watch(['config'], () => one('config', 'settings'), cb),
     async saveSettings(data) { await wait(); patch('config', 'settings', data); emit('config'); },
-    watchRefs: (cb) => watch(['subteams', 'activities', 'spaces'], () => ({ subteams: rows('subteams'), activities: rows('activities'), spaces: rows('spaces') }), cb),
+    watchRefs: (cb) => watch(['subteams', 'activities', 'spaces', 'subsidiaries'], () => ({ subteams: rows('subteams'), activities: rows('activities'), spaces: rows('spaces'), subsidiaries: rows('subsidiaries') }), cb),
     async saveRef(n, item) { await wait(); const { id, ...data } = item; const key = id || uid(n.slice(0, 2)); patch(n, key, data); emit(n); return key; },
     async deleteRef(n, id) { await wait(); delete coll(n)[id]; emit(n); },
     async listSubteams() { await wait(60); return rows('subteams'); },
+    async listSubsidiaries() { await wait(60); return rows('subsidiaries'); },
     async seedStarter(seed) { await wait(); for (const [n, items] of Object.entries(seed)) for (const [id, data] of Object.entries(items)) patch(n, id, data); emit(...Object.keys(seed)); },
 
     watchPresence: (cb) => watch(['presence'], () => rows('presence'), cb),
@@ -157,16 +159,27 @@ export function createDemoBackend() {
     },
     async deleteAnnouncement(id) { await wait(); delete coll('announcements')[id]; emit('announcements'); },
 
+    watchSpaceContent: (spaceId, cb) => watch(['spaceContent'], () => one('spaceContent', spaceId), cb),
+    async createSpace(meta, content = {}) {
+      await wait();
+      const id = uid('sp');
+      put('spaces', id, { ...meta, updatedAt: new Date() });
+      put('spaceContent', id, { tree: [], driveFolder: content.driveFolder || null, updatedAt: new Date() });
+      emit('spaces', 'spaceContent');
+      return id;
+    },
+    async saveSpaceContent(spaceId, p) { await wait(); patch('spaceContent', spaceId, { ...p, updatedAt: new Date() }); emit('spaceContent'); },
+
     watchPage: (id, cb) => watch(['pages'], () => one('pages', id), cb),
     async createPage(spaceId, { title, icon = '📄', parentId = null }, me) {
       await wait();
       const id = uid('pg');
-      const sp = coll('spaces')[spaceId];
-      const siblings = (sp.tree || []).filter((n) => (n.parentId || null) === parentId);
+      const sc = (coll('spaceContent')[spaceId] ||= { tree: [], driveFolder: null });
+      const siblings = (sc.tree || []).filter((n) => (n.parentId || null) === parentId);
       const order = siblings.reduce((m, n) => Math.max(m, n.order || 0), 0) + 1;
       put('pages', id, { spaceId, parentId, title, icon, order, content: { blocks: [] }, rev: 1, createdBy: me.uid, createdByName: me.name, createdAt: new Date(), updatedBy: me.uid, updatedByName: me.name, updatedAt: new Date() });
-      sp.tree = [...(sp.tree || []), { id, title, icon, parentId, order }];
-      emit('pages', 'spaces');
+      sc.tree = [...(sc.tree || []), { id, title, icon, parentId, order }];
+      emit('pages', 'spaceContent');
       return id;
     },
     async savePageContent(page, content, me) {
@@ -184,36 +197,37 @@ export function createDemoBackend() {
       const cur = coll('pages')[page.id];
       const rev = (cur.rev || 0) + 1;
       patch('pages', page.id, { ...p, rev, updatedBy: me.uid, updatedByName: me.name, updatedAt: new Date() });
-      const sp = coll('spaces')[page.spaceId];
-      sp.tree = (sp.tree || []).map((n) => (n.id === page.id ? { ...n, ...p } : n));
-      emit('pages', 'spaces');
+      const sc = coll('spaceContent')[page.spaceId];
+      if (sc) sc.tree = (sc.tree || []).map((n) => (n.id === page.id ? { ...n, ...p } : n));
+      emit('pages', 'spaceContent');
       return rev;
     },
     async deletePage(page) {
       await wait();
-      const sp = coll('spaces')[page.spaceId];
-      const doomed = descendants(sp.tree || [], page.id);
+      const sc = coll('spaceContent')[page.spaceId] || { tree: [] };
+      const doomed = descendants(sc.tree || [], page.id);
       doomed.forEach((id) => delete coll('pages')[id]);
-      sp.tree = (sp.tree || []).filter((n) => !doomed.includes(n.id));
-      emit('pages', 'spaces');
+      sc.tree = (sc.tree || []).filter((n) => !doomed.includes(n.id));
+      emit('pages', 'spaceContent');
     },
     async deleteSpace(spaceId) {
       await wait();
       for (const [id, pg] of Object.entries(coll('pages'))) if (pg.spaceId === spaceId) delete coll('pages')[id];
       for (const [id, t] of Object.entries(coll('tasks'))) if (t.spaceId === spaceId) delete coll('tasks')[id];
+      delete coll('spaceContent')[spaceId];
       delete coll('spaces')[spaceId];
-      emit('pages', 'tasks', 'spaces');
+      emit('pages', 'tasks', 'spaceContent', 'spaces');
     },
     async rebuildTree(spaceId) {
       await wait();
       const tree = rows('pages').filter((p) => p.spaceId === spaceId).map((p) => ({ id: p.id, title: p.title, icon: p.icon, parentId: p.parentId || null, order: p.order || 0 }));
-      coll('spaces')[spaceId].tree = tree;
-      emit('spaces');
+      patch('spaceContent', spaceId, { tree });
+      emit('spaceContent');
       return tree.length;
     },
 
     watchTasks: (spaceId, cb) => watch(['tasks'], () => rows('tasks').filter((t) => t.spaceId === spaceId), cb),
-    async listMyTasks(id) { await wait(); return rows('tasks').filter((t) => (t.assignees || []).includes(id)); },
+    async listMyTasks(id, spaceIds = []) { await wait(); return rows('tasks').filter((t) => (t.assignees || []).includes(id) && spaceIds.includes(t.spaceId)); },
     async saveTask(task, me) {
       await wait(120);
       const { id, ...data } = task;
@@ -223,7 +237,7 @@ export function createDemoBackend() {
       emit('tasks');
       return key;
     },
-    async deleteTask(id) { await wait(); delete coll('tasks')[id]; emit('tasks'); },
+    async deleteTask(task) { await wait(); delete coll('tasks')[task.id]; emit('tasks'); },
 
     async log(me, action, summary, target = {}) { put('audit', uid('au'), { at: new Date(), actorUid: me.uid, actorName: me.name, action, summary, targetType: target.type || null, targetId: target.id || null }); persist(); },
     async listAudit() { await wait(); return rows('audit').sort((a, b) => b.at - a.at); },

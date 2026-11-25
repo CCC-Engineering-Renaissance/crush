@@ -31,64 +31,80 @@ export function buildSeed() {
   const r = rng(20261124);
   const pickOne = (arr) => arr[Math.floor(r() * arr.length)];
 
+  // Crush Depth's subteams follow its Discord channels; Prosthetic's are sample names.
+  const subsidiaries = {
+    crush: { name: 'Crush Depth', color: 'sky', order: 1, discordRole: 'MATE' },
+    prosthetic: { name: 'Prosthetic', color: 'lime', order: 2, discordRole: '' },
+  };
+  const st = (name, subsidiaryId, color, order, discordRole = '') => ({ name, subsidiaryId, color, order, discordRole });
   const subteams = {
-    mechanical: { name: 'Mechanical', color: 'lime', order: 1 },
-    electrical: { name: 'Electrical & Software', color: 'sky', order: 2 },
-    media: { name: 'Media', color: 'orange', order: 3 },
-    business: { name: 'Business', color: 'navy', order: 4 },
+    'cd-marketing': st('Marketing', 'crush', 'orange', 1),
+    'cd-float': st('Float', 'crush', 'sky', 2),
+    'cd-housing': st('Housing', 'crush', 'navy', 3),
+    'cd-manips': st('Manips', 'crush', 'magenta', 4),
+    'cd-chassis': st('Chassis', 'crush', 'lime', 5),
+    'cd-electrical': st('Electrical', 'crush', 'gold', 6, 'MATE Electrical'),
+    'cd-controls': st('Controls systems', 'crush', 'sky', 7, 'Controls'),
+    'pr-electrical': st('Electrical', 'prosthetic', 'gold', 1, 'Prosthetic Electrical'),
+    'pr-mechanical': st('Mechanical', 'prosthetic', 'lime', 2),
+    'pr-signal': st('Signal processing', 'prosthetic', 'magenta', 3),
   };
   const activities = {
     meeting: { name: 'General meeting', subteamId: null, order: 1 },
-    build: { name: 'ROV build & fabrication', subteamId: 'mechanical', order: 2 },
-    cad: { name: 'CAD & design', subteamId: 'mechanical', order: 3 },
-    wiring: { name: 'Electronics & wiring', subteamId: 'electrical', order: 4 },
-    code: { name: 'Software & controls', subteamId: 'electrical', order: 5 },
+    build: { name: 'Build & fabrication', subteamId: 'cd-chassis', order: 2 },
+    cad: { name: 'CAD & design', subteamId: null, order: 3 },
+    wiring: { name: 'Electronics & wiring', subteamId: 'cd-electrical', order: 4 },
+    code: { name: 'Software & controls', subteamId: 'cd-controls', order: 5 },
     pool: { name: 'Pool test', subteamId: null, order: 6 },
     docs: { name: 'Technical documentation', subteamId: null, order: 7 },
-    media: { name: 'Photo, video & social', subteamId: 'media', order: 8 },
-    sponsors: { name: 'Fundraising & sponsors', subteamId: 'business', order: 9 },
-    outreach: { name: 'Outreach event', subteamId: null, order: 10 },
-    intro: { name: 'Intro projects', subteamId: null, order: 11 },
+    media: { name: 'Photo, video & social', subteamId: 'cd-marketing', order: 8 },
+    sponsors: { name: 'Fundraising & sponsors', subteamId: null, order: 9 },
+    eeg: { name: 'EEG & signal processing', subteamId: 'pr-signal', order: 10 },
+    hand: { name: 'Prosthetic hand build', subteamId: 'pr-mechanical', order: 11 },
+    outreach: { name: 'Outreach event', subteamId: null, order: 12 },
+    intro: { name: 'Intro projects', subteamId: null, order: 13 },
   };
   const subActs = {
-    mechanical: ['build', 'build', 'cad'], electrical: ['wiring', 'code', 'code'],
-    business: ['sponsors', 'docs'], media: ['media', 'media', 'docs'],
+    'cd-marketing': ['media', 'media', 'sponsors', 'docs'], 'cd-float': ['build', 'cad', 'pool'], 'cd-housing': ['build', 'cad'],
+    'cd-manips': ['build', 'cad', 'cad'], 'cd-chassis': ['build', 'build', 'cad'], 'cd-electrical': ['wiring', 'wiring', 'code'],
+    'cd-controls': ['code', 'code', 'wiring'], 'pr-electrical': ['wiring', 'eeg'], 'pr-mechanical': ['hand', 'hand', 'cad'], 'pr-signal': ['eeg', 'eeg', 'code'],
   };
 
+  // [uid, name, role, title, subteams, major, pronouns, private spaces they can open]
   const people = [
-    ['u-alex', 'Alex Rivera', 'admin', 'President', ['business'], 'Mechanical Engineering', 'he/him'],
-    ['u-priya', 'Priya Natarajan', 'lead', 'Director of Software', ['electrical'], 'Computer Science', 'she/her'],
-    ['u-marcus', 'Marcus Lee', 'lead', 'Director of Manufacturing', ['mechanical'], 'Manufacturing Technology', 'he/him'],
-    ['u-hannah', 'Hannah Okafor', 'lead', 'Director of Marketing', ['media', 'business'], 'Business Administration', 'she/her'],
-    ['u-sofia', 'Sofia Delgado', 'member', '', ['mechanical'], 'Mechanical Engineering', 'she/her'],
-    ['u-jordan', 'Jordan Kim', 'member', '', ['electrical'], 'Electrical Engineering', 'they/them'],
-    ['u-emily', 'Emily Chen', 'member', '', ['media'], 'Graphic Design', 'she/her'],
-    ['u-diego', 'Diego Ramirez', 'member', '', ['mechanical'], 'Civil Engineering', 'he/him'],
-    ['u-ethan', 'Ethan Brooks', 'member', '', ['electrical'], 'Computer Engineering', 'he/him'],
-    ['u-maya', 'Maya Thompson', 'member', '', ['business'], 'Accounting', 'she/her'],
-    ['u-noah', 'Noah Patel', 'member', '', ['mechanical', 'electrical'], 'Mechanical Engineering', 'he/him'],
-    ['u-isabella', 'Isabella Cruz', 'member', '', ['media'], 'Communication', 'she/her'],
-    ['u-liam', 'Liam Nguyen', 'member', '', ['electrical'], 'Computer Science', 'he/him'],
-    ['u-ava', 'Ava Martinez', 'member', '', ['mechanical'], 'Physics', 'she/her'],
-    ['u-samuel', 'Samuel Ortiz', 'member', '', ['business'], 'Economics', 'he/him'],
-    ['u-chloe', 'Chloe Williams', 'member', '', ['electrical'], 'Electrical Engineering', 'she/her'],
+    ['u-alex', 'Alex Rivera', 'admin', 'President', ['cd-marketing'], 'Mechanical Engineering', 'he/him', []],
+    ['u-priya', 'Priya Natarajan', 'lead', 'Director of Software', ['cd-controls', 'pr-signal'], 'Computer Science', 'she/her', ['cd-leads']],
+    ['u-marcus', 'Marcus Lee', 'lead', 'Director of Manufacturing', ['cd-chassis'], 'Manufacturing Technology', 'he/him', ['cd-leads']],
+    ['u-hannah', 'Hannah Okafor', 'lead', 'Director of Marketing', ['cd-marketing'], 'Business Administration', 'she/her', ['cd-leads', 'cd-mgmt']],
+    ['u-sofia', 'Sofia Delgado', 'member', '', ['cd-chassis'], 'Mechanical Engineering', 'she/her', []],
+    ['u-jordan', 'Jordan Kim', 'member', '', ['cd-electrical'], 'Electrical Engineering', 'they/them', []],
+    ['u-emily', 'Emily Chen', 'member', '', ['cd-marketing'], 'Graphic Design', 'she/her', []],
+    ['u-diego', 'Diego Ramirez', 'member', '', ['cd-float'], 'Civil Engineering', 'he/him', []],
+    ['u-ethan', 'Ethan Brooks', 'member', '', ['pr-signal'], 'Computer Engineering', 'he/him', []],
+    ['u-maya', 'Maya Thompson', 'member', '', ['cd-marketing'], 'Accounting', 'she/her', ['cd-mgmt']],
+    ['u-noah', 'Noah Patel', 'member', '', ['cd-manips', 'pr-mechanical'], 'Mechanical Engineering', 'he/him', []],
+    ['u-isabella', 'Isabella Cruz', 'member', '', ['cd-marketing'], 'Communication', 'she/her', []],
+    ['u-liam', 'Liam Nguyen', 'member', '', ['cd-controls'], 'Computer Science', 'he/him', []],
+    ['u-ava', 'Ava Martinez', 'member', '', ['cd-housing'], 'Physics', 'she/her', []],
+    ['u-samuel', 'Samuel Ortiz', 'member', '', ['cd-marketing'], 'Economics', 'he/him', ['cd-mgmt']],
+    ['u-chloe', 'Chloe Williams', 'member', '', ['pr-electrical'], 'Electrical Engineering', 'she/her', []],
   ];
   const skillsBy = {
-    mechanical: ['SolidWorks', 'Onshape', 'Machining', '3D printing'],
-    electrical: ['Arduino', 'ESP32', 'Python', 'C++', 'PCB design'],
-    business: ['Grant writing', 'Budgets', 'Outreach'],
-    media: ['Photography', 'Premiere Pro', 'Figma'],
+    'cd-chassis': ['SolidWorks', 'Onshape', 'Machining'], 'cd-float': ['Onshape', 'Buoyancy math', '3D printing'], 'cd-housing': ['SolidWorks', 'O-ring design', 'Pressure testing'],
+    'cd-manips': ['Onshape', '3D printing', 'Servos'], 'cd-electrical': ['Soldering', 'PCB design', 'Power systems'], 'cd-controls': ['Python', 'C++', 'ROS'],
+    'cd-marketing': ['Photography', 'Figma', 'Grant writing'], 'pr-electrical': ['Analog circuits', 'KiCad', 'Soldering'], 'pr-mechanical': ['Onshape', '3D printing', 'Linkages'],
+    'pr-signal': ['Python', 'Signal filtering', 'NumPy'],
   };
   const users = {};
-  people.forEach(([uid, name, role, title, subs, major, pronouns], i) => {
+  people.forEach(([uid, name, role, title, subs, major, pronouns, spaceIds], i) => {
     users[uid] = {
-      uid, email: name.toLowerCase().replace(/\s+/g, '.') + '@example.com', name, photoURL: null, role, status: 'active', subteams: subs,
-      title, major, pronouns, bio: i < 4 ? `Officer for the ${subs.map((s) => subteams[s].name).join(' and ')} side of the club.` : '',
+      uid, email: name.toLowerCase().replace(/\s+/g, '.') + '@example.com', name, photoURL: null, role, status: 'active', subteams: subs, spaces: spaceIds,
+      title, major, pronouns, bio: i < 4 ? `Officer for ${subs.map((s) => subteams[s].name).join(' and ')}.` : '',
       skills: skillsBy[subs[0]].slice(0, 3), links: {}, joinNote: '', createdAt: addDays(today, -200 + i * 5),
     };
   });
-  users['u-ryan'] = { uid: 'u-ryan', email: 'ryan.foster@example.com', name: 'Ryan Foster', photoURL: null, role: 'member', status: 'pending', subteams: ['mechanical'], title: '', major: 'Engineering', pronouns: '', bio: '', skills: [], links: {}, joinNote: 'Saw your ROV at the club fair. I have some welding experience and want to help with the frame.', createdAt: addDays(now, -1) };
-  users['u-grace'] = { uid: 'u-grace', email: 'grace.liu@example.com', name: 'Grace Liu', photoURL: null, role: 'member', status: 'pending', subteams: ['media'], title: '', major: 'Film', pronouns: 'she/her', bio: '', skills: [], links: {}, joinNote: 'I make short videos and would love to film the pool tests.', createdAt: addDays(now, -3) };
+  users['u-ryan'] = { uid: 'u-ryan', email: 'ryan.foster@example.com', name: 'Ryan Foster', photoURL: null, role: 'member', status: 'pending', subteams: ['cd-chassis'], spaces: [], title: '', major: 'Engineering', pronouns: '', bio: '', skills: [], links: {}, joinNote: 'Saw your ROV at the club fair. I have some welding experience and want to help with the frame.', createdAt: addDays(now, -1) };
+  users['u-grace'] = { uid: 'u-grace', email: 'grace.liu@example.com', name: 'Grace Liu', photoURL: null, role: 'member', status: 'pending', subteams: ['cd-marketing'], spaces: [], title: '', major: 'Film', pronouns: 'she/her', bio: '', skills: [], links: {}, joinNote: 'I make short videos and would love to film the pool tests.', createdAt: addDays(now, -3) };
 
   // ── Events: Friday meetings (weekly), pool tests, outreach ──
   const events = {};
@@ -98,11 +114,12 @@ export function buildSeed() {
     events[`ev-meet-${w}`] = { title: 'General meeting', type: 'meeting', start: at(fri, 17), end: at(fri, 19), location: 'Engineering lab', description: 'Weekly all-hands. Subteam updates, then build time.', subteams: [], seriesId: 'fridays' };
   }
   const sat = (w) => addDays(weekStart, w * 7 + 5);
-  events['ev-pool-1'] = { title: 'Pool test: buoyancy and thrusters', type: 'pool', start: at(sat(-2), 9), end: at(sat(-2), 12), location: 'CCC pool', description: 'Bring safety glasses and the tether spool.', subteams: ['mechanical', 'electrical'] };
-  events['ev-pool-2'] = { title: 'Pool test: manipulator trials', type: 'pool', start: at(sat(0) < today ? sat(1) : sat(0), 9), end: at(sat(0) < today ? sat(1) : sat(0), 12), location: 'CCC pool', description: 'Gripper v2 and camera tilt. Software team runs the control station.', subteams: ['mechanical', 'electrical'] };
-  events['ev-outreach'] = { title: 'Robotics demo for 7th graders', type: 'outreach', start: at(addDays(weekStart, 9), 13), end: at(addDays(weekStart, 9), 15), location: 'Partner middle school', description: 'Bring the 2024 Pioneer ROV and the demo tank.', subteams: ['media', 'business'] };
-  events['ev-fund'] = { title: 'Sponsor thank-you night', type: 'social', start: at(addDays(weekStart, 17), 18), end: at(addDays(weekStart, 17), 20), location: 'Student Center', description: 'Thank our sponsors with a showcase of the 2026 vehicle.', subteams: ['business'] };
-  events['ev-build'] = { title: 'Build day: frame v3', type: 'build', start: at(addDays(weekStart, 1), 14), end: at(addDays(weekStart, 1), 17), location: 'Fab lab', description: 'Cutting and tapping the new frame plates.', subteams: ['mechanical'] };
+  events['ev-pool-1'] = { title: 'Pool test: buoyancy and thrusters', type: 'pool', start: at(sat(-2), 9), end: at(sat(-2), 12), location: 'CCC pool', description: 'Bring safety glasses and the tether spool.', subteams: ['cd-float', 'cd-controls'] };
+  events['ev-pool-2'] = { title: 'Pool test: manipulator trials', type: 'pool', start: at(sat(0) < today ? sat(1) : sat(0), 9), end: at(sat(0) < today ? sat(1) : sat(0), 12), location: 'CCC pool', description: 'Gripper v2 and camera tilt. Controls runs the control station.', subteams: ['cd-manips', 'cd-controls'] };
+  events['ev-outreach'] = { title: 'Robotics demo for 7th graders', type: 'outreach', start: at(addDays(weekStart, 9), 13), end: at(addDays(weekStart, 9), 15), location: 'Partner middle school', description: 'Bring the 2024 Pioneer ROV and the demo tank.', subteams: ['cd-marketing'] };
+  events['ev-fund'] = { title: 'Sponsor thank-you night', type: 'social', start: at(addDays(weekStart, 17), 18), end: at(addDays(weekStart, 17), 20), location: 'Student Center', description: 'Thank our sponsors with a showcase of the 2026 vehicle.', subteams: ['cd-marketing'] };
+  events['ev-build'] = { title: 'Build day: frame v3', type: 'build', start: at(addDays(weekStart, 1), 14), end: at(addDays(weekStart, 1), 17), location: 'Fab lab', description: 'Cutting and tapping the new frame plates.', subteams: ['cd-chassis'] };
+  events['ev-eeg'] = { title: 'Prosthetic: first EEG recording session', type: 'build', start: at(addDays(weekStart, 3), 15), end: at(addDays(weekStart, 3), 17), location: 'Bio lab', description: 'Baseline recordings with the new headset.', subteams: ['pr-electrical', 'pr-signal'] };
 
   // ── Time entries ──
   const timeEntries = {};
@@ -147,28 +164,37 @@ export function buildSeed() {
 
   // People in the lab right now
   const presence = {};
-  [['u-marcus', 'build', 52], ['u-jordan', 'code', 88], ['u-emily', 'media', 23]].forEach(([uid, act, mins]) => {
+  [['u-marcus', 'build', 52], ['u-jordan', 'wiring', 88], ['u-emily', 'media', 23]].forEach(([uid, act, mins]) => {
     const u = users[uid];
     const s = new Date(now.getTime() - mins * 60000);
     const id = add(u, s, null, { activityId: act, more: { status: 'open' } });
     presence[uid] = { uid, entryId: id, start: s, name: u.name, photoURL: null, activityId: act, subteamId: activities[act].subteamId };
   });
 
-  // ── Spaces and pages ──
+  // ── Spaces and pages: one space per Discord channel, grouped by subsidiary ──
+  const sp = (name, subsidiaryId, subteamId, order, description, extra = {}) => ({ name, subsidiaryId, subteamId, order, description, memberEdit: true, private: false, ...extra });
   const spaces = {
-    club: { name: 'Club HQ', icon: '🐂', color: 'navy', order: 1, memberEdit: false, description: 'How the club runs: onboarding, safety, meeting notes and officer docs.', driveFolder: null },
-    crush: { name: 'Crush Depth', icon: '🌊', color: 'sky', order: 2, memberEdit: true, description: 'The MATE ROV competition team: season plan, design log and pool tests.', driveFolder: { id: 'demo-crush-folder', name: 'Crush Depth 2027', url: '' } },
-    mechanical: { name: 'Mechanical', icon: '⚙️', color: 'lime', order: 3, memberEdit: true, description: 'Frame, thrusters, manipulators and machining.', driveFolder: null },
-    electrical: { name: 'Electrical & Software', icon: '⚡', color: 'sky', order: 4, memberEdit: true, description: 'Power, tether, control station and code.', driveFolder: null },
-    business: { name: 'Business', icon: '💼', color: 'navy', order: 5, memberEdit: true, description: 'Sponsors, budget, fundraising and outreach.', driveFolder: null },
-    media: { name: 'Media', icon: '🎬', color: 'orange', order: 6, memberEdit: true, description: 'Photos, video, social and the marketing display.', driveFolder: null },
+    'club-hq': sp('club-hq', null, null, 1, 'How the club runs: onboarding, lab safety and meeting notes.', { memberEdit: false }),
+    'cd-mgmt': sp('mate-club-mgmt', 'crush', null, 1, 'Running the MATE team: budget, sponsors, travel and registration.', { private: true }),
+    'cd-leads': sp('tech-leads', 'crush', null, 2, 'Subteam leads: design reviews, priorities and the season plan.', { private: true }),
+    'cd-marketing': sp('mate-marketing', 'crush', 'cd-marketing', 3, 'Social posts, the marketing display and sponsor thank-yous.'),
+    'cd-float': sp('float', 'crush', 'cd-float', 4, 'Buoyancy, foam and trim.'),
+    'cd-housing': sp('housing', 'crush', 'cd-housing', 5, 'The electronics enclosure, seals and pressure tests.'),
+    'cd-manips': sp('manips', 'crush', 'cd-manips', 6, 'Manipulators and grippers.'),
+    'cd-chassis': sp('chassis', 'crush', 'cd-chassis', 7, 'The frame, mounts and machining.'),
+    'cd-electrical': sp('electrical', 'crush', 'cd-electrical', 8, 'Power, the tether and wiring.'),
+    'cd-controls': sp('controls-systems', 'crush', 'cd-controls', 9, 'Control code, the control station and sensors.'),
+    'pr-electrical': sp('electrical', 'prosthetic', 'pr-electrical', 1, 'The EEG headset, amplifier board and motor drivers.'),
+    'pr-mechanical': sp('mechanical', 'prosthetic', 'pr-mechanical', 2, 'Finger linkages, the palm and the socket.'),
+    'pr-signal': sp('signal-processing', 'prosthetic', 'pr-signal', 3, 'Filtering EEG signals and turning them into grip commands.'),
   };
+  const folders = { 'cd-leads': { id: 'demo-crush-folder', name: 'Crush Depth 2027', url: '' } };
   const pages = {};
   const mk = (id, spaceId, parentId, title, icon, blocks, by = 'u-alex', daysAgo = 3) => {
     const u = users[by];
     pages[id] = { spaceId, parentId, title, icon, order: Object.keys(pages).length + 1, content: { blocks }, rev: 1, createdBy: by, createdByName: u.name, createdAt: addDays(now, -daysAgo - 20), updatedBy: by, updatedByName: u.name, updatedAt: addDays(now, -daysAgo) };
   };
-  mk('pg-welcome', 'club', null, 'Welcome to Engineering Renaissance', '👋', [
+  mk('pg-welcome', 'club-hq', null, 'Welcome to Engineering Renaissance', '👋', [
     p('This is the home for everything the club runs on. Start here if you are new.'),
     h('Your first two weeks'),
     ul([todo('Sign in to the portal and fill out your profile', true), todo('Come to a Friday meeting (5–7 PM in the engineering lab)'), todo('Read the lab safety rules and sign the sheet'), todo('Pick an intro project team')], 'checklist'),
@@ -176,36 +202,47 @@ export function buildSeed() {
     p('Tap <b>Clock in</b> on the Home tab when you start working and <b>Clock out</b> when you leave. Forgot to clock out? Open the portal and tell us when you left. A lead approves it.'),
     { type: 'warning', data: { title: 'Travel eligibility', message: 'Competition travel spots are based on term hours and attendance. Keep your hours up to date.' } },
   ], 'u-alex', 6);
-  mk('pg-safety', 'club', null, 'Lab safety rules', '⚠️', [
+  mk('pg-safety', 'club-hq', null, 'Lab safety rules', '⚠️', [
     p('Safety comes before speed. These rules apply in the fab lab and at every pool test.'),
     ul(['Safety glasses on whenever tools are running', 'No solo power-tool use', 'Lithium batteries charge in the fire bag only', 'Report every injury to the Director of Safety the same day'], 'ordered'),
     drive('Lab safety sign-off sheet', 'application/vnd.google-apps.spreadsheet'),
   ], 'u-alex', 30);
-  mk('pg-notes', 'club', null, 'Meeting notes', '📝', [p('Notes from every Friday meeting, newest first.')], 'u-hannah', 2);
-  mk('pg-notes-1', 'club', 'pg-notes', 'Notes: last Friday', '🗓️', [
-    h('Updates', 3), ul(['Mechanical: frame v3 plates are cut, tapping next week', 'Software: new joystick mapping merged', 'Business: two sponsor meetings booked']),
+  mk('pg-notes', 'club-hq', null, 'Meeting notes', '📝', [p('Notes from every Friday meeting, newest first.')], 'u-hannah', 2);
+  mk('pg-notes-1', 'club-hq', 'pg-notes', 'Notes: last Friday', '🗓️', [
+    h('Updates', 3), ul(['Chassis: frame v3 plates are cut, tapping next week', 'Controls: new joystick mapping merged', 'Marketing: two sponsor meetings booked']),
     h('Action items', 3), ul([todo('Order replacement thruster props', false), todo('Post pool-test photos', true)], 'checklist'),
   ], 'u-hannah', 2);
-  mk('pg-season', 'crush', null, 'MATE 2027 season plan', '🏆', [
+  mk('pg-season', 'cd-leads', null, 'MATE 2027 season plan', '🏆', [
     p('Our plan for the Explorer class season. Dates move as the competition manual comes out.'),
     { type: 'table', data: { withHeadings: true, content: [['Phase', 'Goal', 'Owner'], ['Design review', 'Frozen frame and electronics layout', 'Marcus'], ['First wet test', 'Neutral buoyancy, all thrusters running', 'Priya'], ['Tech documentation', 'Draft of the technical report', 'Hannah']] } },
     drive('Crush Depth 2027 technical report', 'application/vnd.google-apps.document'),
   ], 'u-marcus', 4);
-  mk('pg-pool', 'crush', null, 'Pool test checklist', '🏊', [
+  mk('pg-designlog', 'cd-leads', null, 'ROV design log', '📐', [p('Decisions, trade-offs and test results, one entry per change.'), h('Thruster layout', 3), p('Moved to a vectored 4 + 2 layout for better strafing. See the CAD in #chassis.')], 'u-priya', 9);
+  mk('pg-budget', 'cd-mgmt', null, 'Season budget and travel', '💵', [p('What we’ve spent, what’s left and what travel will cost.'), drive('2026–27 budget', 'application/vnd.google-apps.spreadsheet')], 'u-hannah', 5);
+  mk('pg-sponsors', 'cd-mgmt', null, 'Sponsorship pipeline', '🤝', [p('Who we are talking to and where each conversation stands.'), drive('Sponsor tracker', 'application/vnd.google-apps.spreadsheet')], 'u-hannah', 3);
+  mk('pg-brand', 'cd-marketing', null, 'Brand guide', '🎨', [p('Colors: deep #273784, sky #2CB5DE, lime #98C741. Headlines in Chakra Petch.'), drive('Logo pack', 'application/vnd.google-apps.folder')], 'u-emily', 20);
+  mk('pg-pool', 'cd-float', null, 'Pool test checklist', '🏊', [
     ul([todo('Charge the topside battery', true), todo('Pressure-test the electronics can', false), todo('Pack spare props and zip ties', false), todo('Assign a safety diver', false)], 'checklist'),
-  ], 'u-priya', 1);
-  mk('pg-designlog', 'crush', null, 'ROV design log', '📐', [p('Decisions, trade-offs and test results, one entry per change.'), h('Thruster layout', 3), p('Moved to a vectored 4 + 2 layout for better strafing. See the CAD in the mechanical space.')], 'u-noah', 9);
-  mk('pg-frame', 'mechanical', null, 'Frame v3 design notes', '🔩', [p('HDPE plates, 1/2 in. Holes tapped for 1/4-20.'), drive('Frame v3 drawings', 'application/pdf')], 'u-marcus', 5);
-  mk('pg-machining', 'mechanical', null, 'Machining requests', '🧰', [p('Add a row before you need a part. Include the drawing link.')], 'u-marcus', 12);
-  mk('pg-wiring', 'electrical', null, 'Wiring standards', '🔌', [ul(['Red is +12 V, black is ground, no exceptions', 'Label both ends of every cable', 'Heat-shrink every splice'])], 'u-priya', 15);
-  mk('pg-code', 'electrical', null, 'Control code setup', '💻', [
+  ], 'u-diego', 1);
+  mk('pg-trim', 'cd-float', null, 'Buoyancy and trim log', '⚖️', [p('Weight in water after each change. Aim for slightly positive.'), { type: 'table', data: { withHeadings: true, content: [['Date', 'Change', 'In-water weight'], ['Week 3', 'Added 2 foam blocks', '+120 g'], ['Week 5', 'New camera housing', '+40 g']] } }], 'u-diego', 6);
+  mk('pg-pressure', 'cd-housing', null, 'Pressure test procedure', '🧪', [ul(['Grease every O-ring', 'Pull 15 inHg vacuum and hold 10 minutes', 'Log any drop before it goes in the pool'], 'ordered')], 'u-ava', 8);
+  mk('pg-gripper', 'cd-manips', null, 'Gripper v2 notes', '🦾', [p('Parallel jaws, servo in a sealed box, printed fingers in PETG.')], 'u-noah', 7);
+  mk('pg-frame', 'cd-chassis', null, 'Frame v3 design notes', '🔩', [p('HDPE plates, 1/2 in. Holes tapped for 1/4-20.'), drive('Frame v3 drawings', 'application/pdf')], 'u-marcus', 5);
+  mk('pg-machining', 'cd-chassis', null, 'Machining requests', '🧰', [p('Add a row before you need a part. Include the drawing link.')], 'u-marcus', 12);
+  mk('pg-wiring', 'cd-electrical', null, 'Wiring standards', '🔌', [ul(['Red is +12 V, black is ground, no exceptions', 'Label both ends of every cable', 'Heat-shrink every splice'])], 'u-jordan', 15);
+  mk('pg-code', 'cd-controls', null, 'Control code setup', '💻', [
     p('Our control code lives on GitHub: <a href="https://github.com/CCC-Engineering-Renaissance/Control-Systems-Code">CCC-Engineering-Renaissance/Control-Systems-Code</a>.'),
     { type: 'code', data: { code: 'git clone https://github.com/CCC-Engineering-Renaissance/Control-Systems-Code\ncd Control-Systems-Code' } },
   ], 'u-priya', 7);
-  mk('pg-sponsors', 'business', null, 'Sponsorship pipeline', '🤝', [p('Who we are talking to and where each conversation stands.'), drive('Sponsor tracker', 'application/vnd.google-apps.spreadsheet')], 'u-hannah', 3);
-  mk('pg-brand', 'media', null, 'Brand guide', '🎨', [p('Colors: deep #273784, sky #2CB5DE, lime #98C741. Headlines in Chakra Petch.'), drive('Logo pack', 'application/vnd.google-apps.folder')], 'u-emily', 20);
-  Object.entries(spaces).forEach(([sid, s]) => {
-    s.tree = Object.entries(pages).filter(([, pg]) => pg.spaceId === sid).map(([id, pg]) => ({ id, title: pg.title, icon: pg.icon, parentId: pg.parentId, order: pg.order }));
+  mk('pg-eeg', 'pr-electrical', null, 'EEG headset setup', '🧠', [ul(['Charge the headset overnight', 'Wet the electrodes with saline, not water', 'Check impedance before every recording'], 'ordered')], 'u-chloe', 4);
+  mk('pg-linkage', 'pr-mechanical', null, 'Finger linkage design', '✋', [p('Four-bar linkage per finger, printed in PETG, driven by one micro servo each.')], 'u-noah', 10);
+  mk('pg-pipeline', 'pr-signal', null, 'Signal pipeline', '📈', [p('Band-pass 8–30 Hz, then a classifier for open and close.'), h('Next', 3), ul(['Record a baseline with eyes open and closed', 'Try a second electrode montage'])], 'u-ethan', 3);
+  const spaceContent = {};
+  Object.keys(spaces).forEach((sid) => {
+    spaceContent[sid] = {
+      tree: Object.entries(pages).filter(([, pg]) => pg.spaceId === sid).map(([id, pg]) => ({ id, title: pg.title, icon: pg.icon, parentId: pg.parentId, order: pg.order })),
+      driveFolder: folders[sid] || null,
+    };
   });
 
   // ── Tasks ──
@@ -214,27 +251,34 @@ export function buildSeed() {
   const task = (spaceId, title, status, assignees, dueIn, priority = 'normal', description = '') => {
     tasks['tk-' + (++tn)] = { spaceId, title, description, status, assignees, due: dueIn == null ? null : isoDate(addDays(today, dueIn)), priority, labels: [], order: tn, createdBy: 'u-alex', createdAt: addDays(now, -10), updatedAt: addDays(now, -tn % 4), completedAt: status === 'done' ? addDays(now, -1) : null };
   };
-  task('crush', 'Freeze the thruster layout', 'doing', ['u-marcus', 'u-noah'], 3, 'high', 'Decide between 4+2 vectored and 6 vertical before the design review.');
-  task('crush', 'Book the pool for two more Saturdays', 'todo', ['u-alex'], 6);
-  task('crush', 'Draft the safety section of the tech report', 'todo', ['u-sofia'], 10);
-  task('crush', 'Waterproof the camera housing', 'blocked', ['u-ava'], -1, 'high', 'Waiting on O-rings from McMaster.');
-  task('crush', 'Record the 2026 vehicle walkthrough video', 'done', ['u-emily'], -3);
-  task('mechanical', 'Tap frame plate holes', 'doing', ['u-sofia', 'u-diego'], 2);
-  task('mechanical', 'Print gripper v2 jaws', 'todo', ['u-ava'], 5);
-  task('electrical', 'Tune depth-hold PID', 'doing', ['u-priya', 'u-liam'], 4, 'high');
-  task('electrical', 'Crimp new tether connectors', 'todo', ['u-jordan', 'u-chloe'], 8);
-  task('electrical', 'Update joystick mapping docs', 'done', ['u-ethan'], -2);
-  task('business', 'Send sponsorship packet to three new companies', 'doing', ['u-maya', 'u-samuel'], 7);
-  task('business', 'Reconcile October receipts', 'todo', ['u-alex'], 2, 'high');
-  task('media', 'Post pool-test reel', 'todo', ['u-isabella'], 1);
-  task('media', 'Update marketing display panel', 'todo', ['u-hannah', 'u-emily'], 14);
+  task('cd-leads', 'Freeze the thruster layout', 'doing', ['u-marcus', 'u-priya'], 3, 'high', 'Decide between 4+2 vectored and 6 vertical before the design review.');
+  task('cd-mgmt', 'Book the pool for two more Saturdays', 'todo', ['u-alex'], 6);
+  task('cd-mgmt', 'Reconcile October receipts', 'todo', ['u-alex', 'u-maya'], 2, 'high');
+  task('cd-mgmt', 'Send sponsorship packet to three new companies', 'doing', ['u-maya', 'u-samuel'], 7);
+  task('cd-marketing', 'Draft the safety section of the tech report', 'todo', ['u-sofia'], 10);
+  task('cd-marketing', 'Record the 2026 vehicle walkthrough video', 'done', ['u-emily'], -3);
+  task('cd-marketing', 'Post pool-test reel', 'todo', ['u-isabella'], 1);
+  task('cd-marketing', 'Update marketing display panel', 'todo', ['u-hannah', 'u-emily'], 14);
+  task('cd-housing', 'Waterproof the camera housing', 'blocked', ['u-ava'], -1, 'high', 'Waiting on O-rings from McMaster.');
+  task('cd-float', 'Cut new foam blocks', 'todo', ['u-diego'], 4);
+  task('cd-chassis', 'Tap frame plate holes', 'doing', ['u-sofia', 'u-diego'], 2);
+  task('cd-manips', 'Print gripper v2 jaws', 'todo', ['u-noah'], 5);
+  task('cd-controls', 'Tune depth-hold PID', 'doing', ['u-priya', 'u-liam'], 4, 'high');
+  task('cd-controls', 'Update joystick mapping docs', 'done', ['u-liam'], -2);
+  task('cd-electrical', 'Crimp new tether connectors', 'todo', ['u-jordan'], 8);
+  task('pr-electrical', 'Solder the EEG amplifier board', 'doing', ['u-chloe'], 6);
+  task('pr-signal', 'Record a baseline EEG session', 'todo', ['u-ethan', 'u-priya'], 3);
+  task('pr-mechanical', 'Print finger linkages v1', 'todo', ['u-noah'], 9);
 
   // ── Announcements ──
+  // Two of these came from Discord: a lead mentioned the portal bot and a subteam role there.
+  const fromDiscord = (channelName, attachments = 0) => ({ source: 'discord', discord: { channelName, url: '', attachments } });
   const announcements = {
     'an-1': { title: 'Welcome to the new member portal', body: 'Clock in and out right here instead of the old site. Tap **Clock in** on Home when you start and **Clock out** when you leave.\n\nForgot to clock out? Open the portal and tell us when you left. A lead approves it.', subteams: [], pinned: true, authorUid: 'u-alex', authorName: 'Alex Rivera', authorPhoto: null, createdAt: addDays(now, -2), updatedAt: addDays(now, -2) },
-    'an-2': { title: 'Pool test this Saturday', body: 'Meet at the pool at 9 AM. Bring safety glasses.\n- Mechanical: gripper v2\n- Software: control station laptop', subteams: ['mechanical', 'electrical'], pinned: false, authorUid: 'u-priya', authorName: 'Priya Natarajan', authorPhoto: null, createdAt: addDays(now, -1), updatedAt: addDays(now, -1) },
-    'an-3': { title: 'Sponsorship packet draft is ready', body: 'Review it in the Business space and leave comments by Thursday.', subteams: ['business'], pinned: false, authorUid: 'u-hannah', authorName: 'Hannah Okafor', authorPhoto: null, createdAt: addDays(now, -4), updatedAt: addDays(now, -4) },
-    'an-4': { title: 'Halloween project photos are up', body: 'Find them in the Media space. Tag yourself when you share them.', subteams: [], pinned: false, authorUid: 'u-hannah', authorName: 'Hannah Okafor', authorPhoto: null, createdAt: addDays(now, -9), updatedAt: addDays(now, -9) },
+    'an-2': { title: 'Pool test this Saturday', body: 'Meet at the pool at 9 AM. Bring safety glasses.\n\n- Manips: gripper v2\n- Controls: control station laptop', subteams: ['cd-manips', 'cd-controls'], pinned: false, authorUid: null, authorName: 'Priya Natarajan', authorPhoto: null, createdAt: new Date(now.getTime() - 3 * 3600e3), updatedAt: new Date(now.getTime() - 3 * 3600e3), ...fromDiscord('controls-systems', 1) },
+    'an-5': { title: 'EEG headset is here', body: 'It’s in the bio lab cabinet. Read **EEG headset setup** in #electrical before the first session on Wednesday.', subteams: ['pr-electrical', 'pr-signal'], pinned: false, authorUid: null, authorName: 'Priya Natarajan', authorPhoto: null, createdAt: addDays(now, -1), updatedAt: addDays(now, -1), ...fromDiscord('prosthetic-general') },
+    'an-3': { title: 'Sponsorship packet draft is ready', body: 'Review it in #mate-club-mgmt and leave comments by Thursday.', subteams: ['cd-marketing'], pinned: false, authorUid: 'u-hannah', authorName: 'Hannah Okafor', authorPhoto: null, createdAt: addDays(now, -4), updatedAt: addDays(now, -4) },
+    'an-4': { title: 'Halloween project photos are up', body: 'Find them in #mate-marketing. Tag yourself when you share them.', subteams: [], pinned: false, authorUid: 'u-hannah', authorName: 'Hannah Okafor', authorPhoto: null, createdAt: addDays(now, -9), updatedAt: addDays(now, -9) },
   };
 
   const settings = {
@@ -242,11 +286,12 @@ export function buildSeed() {
     termGoalHours: 40, weeklyGoalHours: 4, maxSessionHours: 10, locationCheck: { enabled: false, mode: 'flag', lat: null, lng: null, radiusM: 250 },
   };
 
-  const invites = { 'new.officer@example.com': { email: 'new.officer@example.com', role: 'lead', subteams: ['media'], title: 'Social Media Lead', invitedBy: 'u-alex', invitedByName: 'Alex Rivera', createdAt: addDays(now, -1) } };
+  const invites = { 'new.officer@example.com': { email: 'new.officer@example.com', role: 'lead', subteams: ['cd-marketing'], title: 'Social Media Lead', invitedBy: 'u-alex', invitedByName: 'Alex Rivera', createdAt: addDays(now, -1) } };
   const audit = {
     'au-1': { at: addDays(now, -1), actorUid: 'u-priya', actorName: 'Priya Natarajan', action: 'entry.reject', summary: 'Didn’t count Ethan Brooks’s 11 h session', targetType: 'timeEntry', targetId: null },
     'au-2': { at: addDays(now, -3), actorUid: 'u-alex', actorName: 'Alex Rivera', action: 'member.approve', summary: 'Approved Chloe Williams as a member', targetType: 'user', targetId: 'u-chloe' },
+    'au-3': { at: new Date(now.getTime() - 3 * 3600e3), actorUid: null, actorName: 'Discord bot', action: 'announcement.discord', summary: 'Posted “Pool test this Saturday” from #controls-systems for Manips and Controls systems (sent by Priya Natarajan)', targetType: 'announcement', targetId: 'an-2' },
   };
 
-  return { users, subteams, activities, events, timeEntries, presence, spaces, pages, tasks, announcements, config: { settings }, invites, audit };
+  return { users, subsidiaries, subteams, activities, events, timeEntries, presence, spaces, spaceContent, pages, tasks, announcements, config: { settings }, invites, audit };
 }

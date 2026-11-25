@@ -1,6 +1,6 @@
 // Home: the clock-in panel first, then hours, who's in the lab, news, events and tasks.
 import { html, useState, useEffect, useMemo, Icon, Avatar, Chip, useNow, useAsync, toast, toastError, Notice, Loading } from '../lib/ui.js';
-import { useStore, isLead, isAdmin, activityById, subteamById, getState } from '../lib/store.js';
+import { useStore, isLead, isAdmin, activityById, subteamById, getState, visibleSpaces, spaceLabel } from '../lib/store.js';
 import { href } from '../lib/router.js';
 import {
   clockParts, fmtTime, fmtDate, fmtDateTime, relTime, greeting, startOfDay, addDays, startOfWeek, termRange,
@@ -278,14 +278,14 @@ function NewsPanel() {
   const { api, profile } = useStore((s) => ({ api: s.api, profile: s.profile }));
   const [items, setItems] = useState(null);
   useEffect(() => api.watchAnnouncements(setItems, () => setItems([])), [api]);
-  const shown = (items || []).filter((a) => !a.subteams?.length || a.subteams.some((s) => profile.subteams?.includes(s)) || isLead(profile))
-    .sort((a, b) => (b.pinned - a.pinned) || (new Date(b.createdAt) - new Date(a.createdAt))).slice(0, 3);
+  const shown = (items || []).filter((a) => !a.hidden && (!a.subteams?.length || a.subteams.some((s) => profile.subteams?.includes(s)) || isLead(profile)))
+    .sort((a, b) => (!!b.pinned - !!a.pinned) || (new Date(b.createdAt) - new Date(a.createdAt))).slice(0, 3);
   return html`<section class="panel" aria-labelledby="news-h">
     <div class="panel-head"><h2 id="news-h">Announcements</h2><a href="#/announcements">See all</a></div>
     <div class="panel-body">
       ${!items ? html`<${Loading} />` : shown.length ? html`<ul class="list">${shown.map((a) => html`<li key=${a.id}>
         <span class="grow"><div class="row" style="gap:8px">${a.pinned && html`<${Icon} name="pin" size=${15} label="Pinned" />`}<span class="title">${a.title}</span></div>
-          <div class="meta">${a.authorName}, ${relTime(a.createdAt)}</div>
+          <div class="meta">${a.authorName}${a.source === 'discord' ? ` in #${a.discord?.channelName || 'Discord'}` : ''}, ${relTime(a.createdAt)}</div>
           <div class="small clamp-2" style="margin-top:4px;color:var(--text-2)"><${Markdown} text=${a.body.split('\n\n')[0]} class="" /></div></span></li>`)}</ul>`
       : html`<p class="muted" style="margin:6px 0">No announcements yet.</p>`}
     </div>
@@ -311,8 +311,10 @@ function UpcomingPanel({ events }) {
 
 // ───────── My tasks ─────────
 function TasksPanel() {
-  const { api, profile, spaces } = useStore((s) => ({ api: s.api, profile: s.profile, spaces: s.spaces }));
-  const res = useAsync(() => api.listMyTasks(profile.uid), [api, profile.uid]);
+  const { api, profile } = useStore((s) => ({ api: s.api, profile: s.profile }));
+  const spaces = useStore((s) => visibleSpaces(s));
+  const spaceIds = spaces.map((s) => s.id).join(',');
+  const res = useAsync(() => api.listMyTasks(profile.uid, spaceIds ? spaceIds.split(',') : []), [api, profile.uid, spaceIds]);
   const open = (res.data || []).filter((t) => t.status !== 'done').sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999')).slice(0, 6);
   const todayIso = isoDate(new Date());
   return html`<section class="panel" style="margin-top:16px" aria-labelledby="tasks-h">
@@ -321,7 +323,7 @@ function TasksPanel() {
       ${res.loading && !res.data ? html`<${Loading} />` : open.length ? html`<ul class="list">${open.map((t) => {
         const sp = spaces.find((s) => s.id === t.spaceId);
         return html`<li key=${t.id}><${Icon} name="tasks" size=${20} />
-          <span class="grow"><a class="title" href=${href(`/s/${t.spaceId}/board?task=${t.id}`)}>${t.title}</a><div class="meta">${sp ? `${sp.icon || ''} ${sp.name}` : ''}</div></span>
+          <span class="grow"><a class="title" href=${href(`/s/${t.spaceId}/board?task=${t.id}`)}>${t.title}</a><div class="meta">${sp ? `#${spaceLabel(sp)}` : ''}</div></span>
           ${t.due && html`<span class=${'small nowrap ' + (t.due < todayIso ? 'strong' : 'muted')} style=${t.due < todayIso ? 'color:var(--bad)' : ''}>${t.due < todayIso ? 'Overdue, ' : 'Due '}${fmtShortDate(t.due + 'T12:00:00')}</span>`}
         </li>`;
       })}</ul>` : html`<p class="muted" style="margin:6px 0">Nothing assigned to you. Pick something up from a space’s task board.</p>`}

@@ -1,10 +1,11 @@
 // Tasks: a kanban board per space, plus "My tasks" across every space.
 import { html, useState, useEffect, useMemo, useRef, Icon, Avatar, Modal, openModal, Field, MultiSelect, Seg, Loading, Empty, useAsync, toast, toastError, confirmDialog } from '../lib/ui.js';
-import { useStore, setState, getState, isLead, spaceById } from '../lib/store.js';
+import { useStore, setState, getState, isLead, spaceById, canSeeSpace, visibleSpaces, spaceLabel } from '../lib/store.js';
 import { useRoute, href, go } from '../lib/router.js';
 import { isoDate, parseIsoDate, fmtShortDate, addDays, startOfDay, relTime } from '../lib/time.js';
 import { Markdown, plural } from '../lib/text.js';
-import { useTitle } from './common.js';
+import { useTitle, SpaceIcon } from './common.js';
+import { NoAccess } from './spaces.js';
 
 export const COLUMNS = [['todo', 'To do'], ['doing', 'In progress'], ['blocked', 'Blocked'], ['done', 'Done']];
 const PRIORITY = { high: 'High', normal: 'Normal', low: 'Low' };
@@ -28,9 +29,11 @@ const dueLabel = (due, status) => {
 // ───────── My tasks ─────────
 export function MyTasks() {
   useTitle('Tasks');
-  const { api, profile, spaces } = useStore((s) => ({ api: s.api, profile: s.profile, spaces: s.spaces }));
+  const { api, profile } = useStore((s) => ({ api: s.api, profile: s.profile }));
+  const spaces = useStore((s) => visibleSpaces(s));
+  const spaceIds = spaces.map((s) => s.id).join(',');
   const [tick, setTick] = useState(0);
-  const res = useAsync(() => api.listMyTasks(profile.uid), [api, profile.uid, tick]);
+  const res = useAsync(() => api.listMyTasks(profile.uid, spaceIds ? spaceIds.split(',') : []), [api, profile.uid, tick, spaceIds]);
   const tasks = res.data || [];
   const today = isoDate(new Date()), weekOut = isoDate(addDays(new Date(), 7));
   const groups = [
@@ -42,7 +45,7 @@ export function MyTasks() {
   ].filter(([, l]) => l.length);
   return html`<div class="content">
     <div class="page-head"><div><h1>Tasks</h1><p>Everything assigned to you, across every space. Each space also has its own board.</p></div></div>
-    <div class="chips" style="margin-bottom:20px">${spaces.map((s) => html`<a key=${s.id} class="chip chip-toggle" style="text-decoration:none" href=${href(`/s/${s.id}/board`)}>${s.icon} ${s.name} board</a>`)}</div>
+    <div class="chips" style="margin-bottom:20px">${spaces.map((s) => html`<a key=${s.id} class="chip chip-toggle" style="text-decoration:none" href=${href(`/s/${s.id}/board`)}><${SpaceIcon} space=${s} size=${14} />${spaceLabel(s)}</a>`)}</div>
     ${res.loading && !res.data ? html`<${Loading} />` : !groups.length
       ? html`<div class="panel"><${Empty} title="Nothing assigned to you">Open a space’s board to pick something up, or ask a lead what needs doing.</${Empty}></div>`
       : groups.map(([label, list]) => html`<section key=${label} style="margin-bottom:20px">
@@ -51,10 +54,10 @@ export function MyTasks() {
             const sp = spaceById(t.spaceId); const d = dueLabel(t.due, t.status);
             return html`<li key=${t.id}>
               <button class="btn btn-sm btn-icon btn-quiet" aria-label=${t.status === 'done' ? 'Mark not done' : 'Mark done'} title=${t.status === 'done' ? 'Mark not done' : 'Mark done'}
-                onClick=${async () => { try { await api.saveTask({ id: t.id, status: t.status === 'done' ? 'todo' : 'done', order: t.order, completedAt: t.status === 'done' ? null : new Date() }, profile, { assigneeOnly: true }); setTick(tick + 1); } catch (e) { toastError(e); } }}>
+                onClick=${async () => { try { await api.saveTask({ id: t.id, spaceId: t.spaceId, status: t.status === 'done' ? 'todo' : 'done', order: t.order, completedAt: t.status === 'done' ? null : new Date() }, profile, { assigneeOnly: true }); setTick(tick + 1); } catch (e) { toastError(e); } }}>
                 <${Icon} name=${t.status === 'done' ? 'check' : 'tasks'} size=${20} /></button>
               <span class="grow"><a class="title" href=${href(`/s/${t.spaceId}/board?task=${t.id}`)} style=${t.status === 'done' ? 'text-decoration:line-through;color:var(--text-3)' : ''}>${t.title}</a>
-                <div class="meta">${sp ? `${sp.icon} ${sp.name}` : ''}${t.status !== 'todo' && t.status !== 'done' ? `, ${COLUMNS.find(([k]) => k === t.status)?.[1]}` : ''}</div></span>
+                <div class="meta">${sp ? `#${spaceLabel(sp)}` : ''}${t.status !== 'todo' && t.status !== 'done' ? `, ${COLUMNS.find(([k]) => k === t.status)?.[1]}` : ''}</div></span>
               ${d && html`<span class="small nowrap" style=${d[1] ? 'color:var(--bad);font-weight:700' : 'color:var(--text-3)'}>${d[0]}</span>`}
             </li>`;
           })}</ul></div></section>`)}
@@ -73,8 +76,9 @@ export function Board({ spaceId }) {
   const [q, setQ] = useState('');
   const [dragId, setDragId] = useState(null);
   const [over, setOver] = useState(null);
-  const canEdit = isLead(profile) || !!space?.memberEdit;
-  useEffect(() => api.watchTasks(spaceId, setTasks, (e) => { setTasks([]); toastError(e); }), [api, spaceId]);
+  const allowed = canSeeSpace(space, profile);
+  const canEdit = allowed && (isLead(profile) || !!space?.memberEdit);
+  useEffect(() => (allowed ? api.watchTasks(spaceId, setTasks, (e) => { setTasks([]); toastError(e); }) : undefined), [api, spaceId, allowed]);
 
   // Open a task straight from a link (#/s/<space>/board?task=<id>)
   const opened = useRef(false);
@@ -87,6 +91,7 @@ export function Board({ spaceId }) {
   }, [tasks]);
 
   if (!space) return html`<div class="content"><${Empty} title="This space doesn’t exist">It may have been deleted.</${Empty}></div>`;
+  if (!allowed) return html`<div class="content"><${NoAccess} space=${space} /></div>`;
   const shown = (tasks || []).filter((t) => (!mine || t.assignees?.includes(profile.uid)) && (!q || t.title.toLowerCase().includes(q.toLowerCase())));
 
   const move = async (t, status) => {
@@ -94,14 +99,14 @@ export function Board({ spaceId }) {
     const assignee = t.assignees?.includes(profile.uid);
     if (!canEdit && !assignee) { toast('Only leads and people on this task can move it.', { kind: 'bad' }); return; }
     setTasks((cur) => cur.map((x) => (x.id === t.id ? { ...x, status } : x)));
-    try { await api.saveTask({ id: t.id, status, order: Date.now(), completedAt: status === 'done' ? new Date() : null }, profile, { assigneeOnly: !canEdit }); }
+    try { await api.saveTask({ id: t.id, spaceId, status, order: Date.now(), completedAt: status === 'done' ? new Date() : null }, profile, { assigneeOnly: !canEdit }); }
     catch (e) { toastError(e); }
   };
 
   return html`<div class="content wide">
-    <div class="crumbs"><a href=${href('/s/' + space.id)}>${space.icon} ${space.name}</a><${Icon} name="chevronRight" /><span>Task board</span></div>
+    <div class="crumbs"><a href=${href('/s/' + space.id)} class="row" style="gap:4px"><${SpaceIcon} space=${space} size=${15} />${space.name}</a><${Icon} name="chevronRight" /><span>Task board</span></div>
     <div class="page-head">
-      <div><h1>${space.name} tasks</h1><p>${canEdit ? 'Drag cards between columns. Click a card for details.' : 'Leads manage this board. You can move tasks assigned to you.'}</p></div>
+      <div><h1>#${space.name} tasks</h1><p>${canEdit ? 'Drag cards between columns. Click a card for details.' : 'Leads manage this board. You can move tasks assigned to you.'}</p></div>
       <div class="actions">
         <div class="search" style="width:220px"><${Icon} name="search" /><input class="input" type="search" placeholder="Find a task" value=${q} onInput=${(e) => setQ(e.target.value)} /></div>
         <${Seg} label="Show" value=${mine ? 'mine' : 'all'} onChange=${(v) => setMine(v === 'mine')} options=${[['all', 'Everyone'], ['mine', 'Mine']]} />
@@ -162,7 +167,7 @@ function TaskEditor({ task, spaceId, close }) {
   const { api, profile } = useStore((s) => ({ api: s.api, profile: s.profile }));
   const space = useStore((s) => s.spaces.find((x) => x.id === spaceId));
   const members = useMembers();
-  const canEdit = isLead(profile) || !!space?.memberEdit;
+  const canEdit = canSeeSpace(space, profile) && (isLead(profile) || !!space?.memberEdit);
   const [f, setF] = useState({ title: task.title, description: task.description || '', status: task.status, assignees: task.assignees || [], due: task.due || '', priority: task.priority || 'normal' });
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -171,13 +176,13 @@ function TaskEditor({ task, spaceId, close }) {
     setBusy(true);
     try {
       if (canEdit) await api.saveTask({ id: task.id, spaceId, title: f.title.trim(), description: f.description.trim(), status: f.status, assignees: f.assignees, due: f.due || null, priority: f.priority, labels: task.labels || [], order: task.order || Date.now(), completedAt: f.status === 'done' ? (task.completedAt || new Date()) : null }, profile);
-      else await api.saveTask({ id: task.id, status: f.status, order: task.order || Date.now(), completedAt: f.status === 'done' ? new Date() : null }, profile, { assigneeOnly: true });
+      else await api.saveTask({ id: task.id, spaceId, status: f.status, order: task.order || Date.now(), completedAt: f.status === 'done' ? new Date() : null }, profile, { assigneeOnly: true });
       toast('Task saved.'); close();
     } catch (e) { toastError(e); setBusy(false); }
   };
   const remove = async () => {
     if (!(await confirmDialog({ title: 'Delete this task?', body: `“${task.title}” will be removed from the board.`, confirmLabel: 'Delete task', danger: true }))) return;
-    try { await api.deleteTask(task.id); toast('Task deleted.'); close(); } catch (e) { toastError(e); }
+    try { await api.deleteTask({ id: task.id, spaceId }); toast('Task deleted.'); close(); } catch (e) { toastError(e); }
   };
   const canDelete = isLead(profile) || (canEdit && task.createdBy === profile.uid);
   const canMove = canEdit || (task.assignees || []).includes(profile.uid);

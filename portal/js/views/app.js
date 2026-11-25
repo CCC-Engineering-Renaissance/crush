@@ -1,7 +1,7 @@
 // Root component: picks the backend, then walks a visitor through sign-in, joining and approval.
 import { html, useState, useEffect, useRef, Icon, Toasts, ModalHost, toastError, friendlyError, Field, Spinner } from '../lib/ui.js';
 import { useStore, setState, getState } from '../lib/store.js';
-import { DemoBar, initTheme } from './common.js';
+import { DemoBar, initTheme, SubteamPicker } from './common.js';
 import { BullArt } from './bull-art.js';
 import { Portal } from './shell.js';
 
@@ -166,12 +166,14 @@ function Join() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const [interests, setInterests] = useState([['mechanical', 'Mechanical'], ['electrical', 'Electrical & Software'], ['media', 'Media'], ['business', 'Business']]);
+  // Subteams grouped by subsidiary, so "Electrical" on Crush Depth and on Prosthetic read apart.
+  const [teams, setTeams] = useState({ subteams: [], subsidiaries: [] });
   useEffect(() => {
-    api.listSubteams?.().then((list) => {
-      const live = (list || []).filter((s) => !s.archived).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
-      if (live.length) setInterests(live.map((s) => [s.id, s.name]));
-    }).catch(() => { /* keep the defaults */ });
+    const byOrder = (a, b) => (a.order ?? 99) - (b.order ?? 99);
+    Promise.all([api.listSubteams?.() || [], api.listSubsidiaries?.().catch(() => []) || []]).then(([list, subs]) => setTeams({
+      subteams: (list || []).filter((s) => !s.archived).sort(byOrder),
+      subsidiaries: (subs || []).sort(byOrder),
+    })).catch(() => { /* the question just stays hidden */ });
   }, [api]);
   const submit = async (e) => {
     e.preventDefault();
@@ -185,10 +187,9 @@ function Join() {
       <${Field} label="Your name" full><input class="input" value=${form.name} onInput=${set('name')} required maxlength="80" autocomplete="name" /></${Field}>
       <${Field} label="Pronouns (optional)"><input class="input" value=${form.pronouns} onInput=${set('pronouns')} maxlength="30" /></${Field}>
       <${Field} label="Major"><input class="input" value=${form.major} onInput=${set('major')} maxlength="80" /></${Field}>
-      <div class="field full" role="group" aria-labelledby="join-interests"><span id="join-interests">What do you want to work on?</span>
-        <div class="chips">${interests.map(([id, label]) => html`<button type="button" key=${id} class="chip chip-toggle" aria-pressed=${String(form.subteams.includes(id))}
-          onClick=${() => setForm({ ...form, subteams: form.subteams.includes(id) ? form.subteams.filter((x) => x !== id) : [...form.subteams, id] })}>${label}</button>`)}</div>
-      </div>
+      ${teams.subteams.length > 0 && html`<div class="field full" role="group" aria-labelledby="join-interests"><span id="join-interests">What do you want to work on?</span>
+        <${SubteamPicker} value=${form.subteams} onChange=${(v) => setForm({ ...form, subteams: v })} subteams=${teams.subteams} subsidiaries=${teams.subsidiaries} />
+      </div>`}
       <${Field} label="Anything officers should know? (optional)" full><textarea class="textarea" value=${form.joinNote} onInput=${set('joinNote')} maxlength="1000"></textarea></${Field}>
       ${err && html`<p class="form-error full" role="alert">${err}</p>`}
       <div class="full gate-actions">
