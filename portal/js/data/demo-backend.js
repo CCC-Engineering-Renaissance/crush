@@ -3,7 +3,8 @@
 import { buildSeed, PERSONAS, VISITOR } from './demo-seed.js';
 import { descendants } from './tree.js';
 
-const KEY = 'er-portal-demo-v3';
+// Bumped whenever the sample data changes shape, so every browser starts over with the new set.
+const KEY = 'er-portal-demo-v4';
 const PERSONA_KEY = 'er-portal-demo-persona';
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 

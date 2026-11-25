@@ -14,11 +14,11 @@ const STATUS = { active: 'Active', pending: 'Waiting for approval', inactive: 'I
 
 export function Admin({ tab }) {
   useTitle('Admin');
-  const { pendingMembers, subteams, settingsSaved } = useStore((s) => ({ pendingMembers: s.pendingMembers, subteams: s.subteams, settingsSaved: s.settingsSaved }));
+  const { pendingMembers, subteams, subsidiaries, settingsSaved } = useStore((s) => ({ pendingMembers: s.pendingMembers, subteams: s.subteams, subsidiaries: s.subsidiaries, settingsSaved: s.settingsSaved }));
   const t = TABS.find(([k]) => k === tab) ? tab : 'members';
   return html`<div class="content wide">
     <div class="page-head"><div><h1>Admin</h1><p>Who gets in, what they can do, and how the club is set up.</p></div></div>
-    ${!subteams.length && html`<${StarterContent} settingsSaved=${settingsSaved} />`}
+    ${(!subteams.length || !subsidiaries.length) && html`<${StarterContent} settingsSaved=${settingsSaved} hasTeams=${subteams.length > 0} />`}
     <nav class="tabs" aria-label="Admin sections">${TABS.map(([k, l]) => html`<a key=${k} href=${href('/admin/' + k)} aria-current=${t === k ? 'page' : undefined}>${l}${k === 'members' && pendingMembers.length ? html`<span class="badge badge-warn">${pendingMembers.length}</span>` : ''}</a>`)}</nav>
     ${t === 'members' && html`<${MembersAdmin} />`}
     ${t === 'invites' && html`<${InvitesAdmin} />`}
@@ -33,7 +33,9 @@ export function Admin({ tab }) {
 // ───────── First run ─────────
 // Crush Depth's subteams and spaces follow the team's Discord channels. Prosthetic's three are a
 // starting guess (electrical, mechanical, signal processing); rename them to match.
-const sub = (name, subsidiaryId, color, order) => ({ name, subsidiaryId, color, order, discordRole: '' });
+// archived: false brings back a starter subteam or activity that was archived before.
+const sub = (name, subsidiaryId, color, order) => ({ name, subsidiaryId, color, order, discordRole: '', archived: false });
+const act = (name, subteamId, order) => ({ name, subteamId, order, archived: false });
 const space = (name, subsidiaryId, subteamId, order, description, extra = {}) => ({ name, subsidiaryId, subteamId, order, description, memberEdit: true, private: false, ...extra });
 const STARTER_SPACES = {
   'club-hq': space('club-hq', null, null, 1, 'How the club runs: onboarding, lab safety and meeting notes.', { memberEdit: false }),
@@ -68,38 +70,45 @@ export const STARTER = {
     'pr-signal': sub('Signal processing', 'prosthetic', 'magenta', 3),
   },
   activities: {
-    meeting: { name: 'General meeting', subteamId: null, order: 1 },
-    build: { name: 'Build & fabrication', subteamId: 'cd-chassis', order: 2 },
-    cad: { name: 'CAD & design', subteamId: null, order: 3 },
-    wiring: { name: 'Electronics & wiring', subteamId: 'cd-electrical', order: 4 },
-    code: { name: 'Software & controls', subteamId: 'cd-controls', order: 5 },
-    pool: { name: 'Pool test', subteamId: null, order: 6 },
-    docs: { name: 'Technical documentation', subteamId: null, order: 7 },
-    media: { name: 'Photo, video & social', subteamId: 'cd-marketing', order: 8 },
-    sponsors: { name: 'Fundraising & sponsors', subteamId: null, order: 9 },
-    eeg: { name: 'EEG & signal processing', subteamId: 'pr-signal', order: 10 },
-    hand: { name: 'Prosthetic hand build', subteamId: 'pr-mechanical', order: 11 },
-    outreach: { name: 'Outreach event', subteamId: null, order: 12 },
-    intro: { name: 'Intro projects', subteamId: null, order: 13 },
+    meeting: act('General meeting', null, 1),
+    build: act('Build & fabrication', 'cd-chassis', 2),
+    cad: act('CAD & design', null, 3),
+    wiring: act('Electronics & wiring', 'cd-electrical', 4),
+    code: act('Software & controls', 'cd-controls', 5),
+    pool: act('Pool test', null, 6),
+    docs: act('Technical documentation', null, 7),
+    media: act('Photo, video & social', 'cd-marketing', 8),
+    sponsors: act('Fundraising & sponsors', null, 9),
+    eeg: act('EEG & signal processing', 'pr-signal', 10),
+    hand: act('Prosthetic hand build', 'pr-mechanical', 11),
+    outreach: act('Outreach event', null, 12),
+    intro: act('Intro projects', null, 13),
   },
+  // Page lists start empty on their own; leaving spaceContent out keeps any pages a space already has.
   spaces: STARTER_SPACES,
-  spaceContent: Object.fromEntries(Object.keys(STARTER_SPACES).map((id) => [id, { tree: [], driveFolder: null }])),
 };
 
-function StarterContent({ settingsSaved }) {
+function StarterContent({ settingsSaved, hasTeams }) {
   const { api, profile } = useStore((s) => ({ api: s.api, profile: s.profile }));
   const [busy, setBusy] = useState(false);
+  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem('er-starter-hidden') === '1'; } catch { return false; } });
+  if (hasTeams && hidden) return null;
+  const hide = () => { setHidden(true); try { localStorage.setItem('er-starter-hidden', '1'); } catch { /* ignore */ } };
   const add = async () => {
     setBusy(true);
     try {
       await api.seedStarter({ ...STARTER, ...(settingsSaved ? {} : { config: { settings: DEFAULT_SETTINGS } }) });
       api.log(profile, 'setup.starter', 'Added the starter subsidiaries, subteams, activities and spaces');
-      toast('Starter subsidiaries, subteams, activities and spaces added.');
-    } catch (e) { toastError(e); setBusy(false); }
+      toast('Crush Depth and Prosthetic added, with their subteams and spaces.');
+    } catch (e) { toastError(e); }
+    setBusy(false);
   };
   return html`<div style="margin-bottom:20px"><${Notice} kind="info">
-    <b>Set up the basics in one click.</b> Adds Crush Depth and Prosthetic as subsidiaries, with a subteam and a space for each of Crush Depth’s Discord channels (mate-club-mgmt and tech-leads start out private). Also adds a club-wide club-hq space and the activities members pick when they clock in. Prosthetic’s three subteams are a guess from the website, so rename them to match. You can change any of it afterwards.
-    <div style="margin-top:10px"><button class="btn btn-primary btn-sm" onClick=${add} disabled=${busy}>${busy ? 'Adding…' : 'Add starter content'}</button></div>
+    ${hasTeams
+      ? html`<b>Add Crush Depth and Prosthetic.</b> Adds both as subsidiaries, with a subteam and a space for each of Crush Depth’s Discord channels (mate-club-mgmt and tech-leads start out private). Prosthetic’s three subteams are a guess from the website, so rename them to match. Your current subteams and spaces stay; archive or delete the old ones afterwards.`
+      : html`<b>Set up the basics in one click.</b> Adds Crush Depth and Prosthetic as subsidiaries, with a subteam and a space for each of Crush Depth’s Discord channels (mate-club-mgmt and tech-leads start out private). Also adds a club-wide club-hq space and the activities members pick when they clock in. Prosthetic’s three subteams are a guess from the website, so rename them to match. You can change any of it afterwards.`}
+    <div class="row" style="margin-top:10px;gap:8px"><button class="btn btn-primary btn-sm" onClick=${add} disabled=${busy}>${busy ? 'Adding…' : 'Add starter content'}</button>
+      ${hasTeams && html`<button class="btn btn-sm btn-quiet" onClick=${hide}>Not now</button>`}</div>
   </${Notice}></div>`;
 }
 
