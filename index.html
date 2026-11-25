@@ -233,6 +233,19 @@ p{text-wrap:pretty}
 .award-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:30px;list-style:none}
 .award-pills li{padding:7px 13px;border-radius:999px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.38);font-size:14.5px;font-weight:550}
 
+/* Prosthetic hand: two poster-session photos layered beside the text, an EEG trace, then the whole group */
+.proj-media{display:flow-root}
+.proj-media img,.proj-team{display:block;width:100%;height:auto;border-radius:var(--r);background:var(--bg-2)}
+.proj-media .proj-a{width:84%;margin-left:auto;box-shadow:0 1px 0 var(--line),0 16px 36px rgba(17,19,24,.12)}
+.proj-media .proj-b{position:relative;width:58%;margin-top:-20%;box-shadow:0 0 0 6px var(--bg),0 22px 44px rgba(17,19,24,.18)}
+.proj-team{box-shadow:0 1px 0 var(--line),0 16px 36px rgba(17,19,24,.1)}
+.signal-box{margin:64px 0 20px}
+.signal{display:block;width:100%;height:72px;color:var(--deep);clip-path:inset(0 100% 0 0);transition:clip-path 1.6s cubic-bezier(.3,.7,.2,1)}
+.signal.drawn{clip-path:inset(0 0 0 0)}
+.signal.instant{transition:none}
+.signal path{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linejoin:round;stroke-linecap:round}
+@media (max-width:800px){.proj-media .proj-a{width:88%}.proj-media .proj-b{width:66%;margin-top:-16%}.signal-box{margin:44px 0 16px}.signal{height:56px}}
+
 /* Photos and carousels */
 .photo-slot{width:100%;border-radius:var(--r);overflow:hidden;background:var(--bg-2);border:1px solid var(--line)}
 .photo-slot img{width:100%;height:100%;object-fit:cover}
@@ -470,7 +483,7 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
     <div class="wrap pool-grid">
       <div>
         <h2 class="h2">Crush Depth, our MATE ROV team</h2>
-        <p class="lede">Crush Depth designs, builds and pilots underwater robots for the MATE ROV Competition. After winning the Pioneer Class in 2024, the team now competes in the Explorer Class.</p>
+        <p class="lede">Crush Depth designs, builds and pilots underwater robots for the MATE ROV Competition.</p>
         <div class="actions"><a class="btn" href="#crushdepth" data-go="crushdepth">Read about Crush Depth</a></div>
       </div>
       <div class="awards-card">
@@ -739,8 +752,9 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
     </div>
   </header>
 
-  <section class="section">
-    <div class="wrap split">
+  <section class="section proj">
+    <div class="wrap">
+     <div class="split">
       <div>
         <h2 class="h2">EEG-controlled prosthetic hand</h2>
         <p class="muted" style="margin-top:10px;font-weight:600">With the MEDLIFE Club and MESA</p>
@@ -749,7 +763,16 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
           <p>Engineering students handle the embedded systems, signal processing and mechanical design. Biology and pre-med students from MEDLIFE bring neuroscience and human-factors expertise. MESA gives students from underrepresented groups a way into the research.</p>
         </div>
       </div>
-      <div id="carousel-prosthetic"></div>
+      <div class="proj-media">
+        <img class="proj-a" src="prosthetic-biology.webp" alt="A student presents the Prosthetic Arm: Biology poster" width="1179" height="750" loading="lazy" decoding="async">
+        <img class="proj-b" src="prosthetic-safety.webp" alt="Four students stand beside the Prosthetic Arm: Mission and Safety poster" width="1179" height="722" loading="lazy" decoding="async">
+      </div>
+     </div>
+      <!-- An EEG trace leading into the group photo. It draws in when it scrolls into view and, with a mouse,
+           spikes wherever the pointer moves across the section (it stays still with reduced motion or the
+           animations paused). -->
+      <div class="signal-box"><svg class="signal" aria-hidden="true" focusable="false"><path/></svg></div>
+      <img class="proj-team" src="prosthetic-team.webp" alt="Students from the project stand behind their table of prosthetic arm posters, with an anatomical model of an arm" width="1179" height="405" loading="lazy" decoding="async">
     </div>
   </section>
 
@@ -936,9 +959,8 @@ const carouselImgs={
   intro:      ['project-intro-1.jpg','project-intro-2.jpg','project-intro-3.jpg','project-intro-4.jpg'],
   halloween:  ['project-halloween-1.jpg','project-halloween-2.jpg','project-halloween-3.jpg'],
   crushdepth: ['competition-1.jpg','competition-2.jpg','competition-3.jpg'],
-  prosthetic: ['eeg-prosthetic-1.jpeg','eeg2.jpg','eeg3.jpg','eeg4.jpg'],
 };
-const carouselAlt={intro:'Intro project',halloween:'Halloween project',crushdepth:'Crush Depth at competition',prosthetic:'EEG prosthetic hand project'};
+const carouselAlt={intro:'Intro project',halloween:'Halloween project',crushdepth:'Crush Depth at competition'};
 
 // ── Rendering ──
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1007,7 +1029,6 @@ function renderAll(){
 function buildCarousels(page){
   if(page==='projects'){buildCarousel('carousel-intro','intro','4/5');buildCarousel('carousel-halloween','halloween','4/5')}
   if(page==='crushdepth')buildCarousel('carousel-crushdepth','crushdepth','16/9');
-  if(page==='impact')buildCarousel('carousel-prosthetic','prosthetic','4/5');
 }
 
 // ── Navigation: one page shows at a time; the address bar keeps #page so links and Back work ──
@@ -1071,6 +1092,52 @@ function setMotionPaused(paused){
   window.syncSectionVideos=sync;
 })();
 document.addEventListener('click',e=>{const b=e.target.closest('.motion-btn');if(b)setMotionPaused(b.getAttribute('aria-pressed')!=='true')});
+// ── The prosthetic section's EEG trace. The calm line is the same on every visit (seeded noise). With a mouse,
+//    moving across the section makes the signal spike under the pointer; it settles a second or two after the
+//    pointer stops. Nothing moves with reduced motion or the animations paused. ──
+(function(){
+  const svg=document.querySelector('.signal');if(!svg)return;
+  const path=svg.querySelector('path'),sec=svg.closest('section');
+  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)');
+  const fine=window.matchMedia('(hover:hover) and (pointer:fine)');
+  const still=()=>reduce.matches||document.documentElement.classList.contains('motion-paused');
+  const R=[];let seed=7;for(let i=0;i<512;i++){seed=seed*16807%2147483647;R.push(seed/1073741823.5-1)}
+  const noise=x=>{const i=Math.floor(x),f=x-i,u=f*f*(3-2*f);return R[i&511]*(1-u)+R[(i+1)&511]*u};
+  const fbm=x=>noise(x)*.6+noise(x*2.3+17)*.28+noise(x*5.1+41)*.12;
+  let W=0,H=0,bx=0,tx=0,b=0,t=0,raf=0,last=0,ready=false;
+  function draw(){
+    if(!W)return;
+    const mid=H/2,a0=H*.15,a1=H*.44,sig=Math.max(56,W*.05),pts=[];
+    for(let x=2;x<=W-2;x+=2){
+      const g=b?b*Math.exp(-(((x-bx)/sig)**2)):0;
+      let y=a0*fbm(x/9)+(g?a1*g*(.62*Math.sin(x*.5+t*11)+.38*fbm(x/3+t*6)):0);
+      y=Math.max(2-mid,Math.min(mid-2,y));
+      pts.push(x+','+(mid-y).toFixed(1));
+    }
+    path.setAttribute('d','M'+pts.join('L'));
+  }
+  new ResizeObserver(es=>{const c=es[0].contentRect;W=Math.round(c.width);H=Math.round(c.height);if(W){svg.setAttribute('viewBox',`0 0 ${W} ${H}`);draw()}}).observe(svg);
+  function tick(now){
+    const dt=Math.min(.05,(now-last)/1000);last=now;t+=dt;
+    bx+=(tx-bx)*Math.min(1,dt*12);
+    b=still()?0:b*Math.pow(.08,dt);
+    if(b<.01)b=0;
+    draw();
+    raf=b?requestAnimationFrame(tick):0;
+  }
+  sec.addEventListener('pointermove',e=>{
+    if(!ready||!fine.matches||still())return;
+    const r=svg.getBoundingClientRect();
+    tx=Math.max(0,Math.min(W,e.clientX-r.left));
+    if(!b)bx=tx;
+    b=Math.min(1,b+.3);
+    if(!raf){last=performance.now();raf=requestAnimationFrame(tick)}
+  });
+  const show=()=>{if(still())svg.classList.add('instant');svg.classList.add('drawn');setTimeout(()=>{ready=true},still()?0:1600)};
+  if(!('IntersectionObserver' in window))return show();
+  const io=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){io.disconnect();show()}},{threshold:.6});
+  io.observe(svg.parentElement);
+})();
 
 const start=location.hash.slice(1)||'home';
 if(start==='home'||!pages.includes(start)){const hero=document.querySelector('.hero');hero.classList.add('enter');setTimeout(()=>hero.classList.remove('enter'),1200)}
