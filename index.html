@@ -166,6 +166,11 @@ p{text-wrap:pretty}
 .comp-logos-rule{width:1px;height:96px;background:var(--line-2)}
 @media (max-width:1000px){.comp-intro{flex-direction:column;align-items:flex-start}.comp-logos{gap:24px}.comp-logo-team{width:88px}.comp-logo-mate{width:156px}.comp-logos-rule{height:72px}}
 
+/* A section with a muted video playing faintly behind it ("Our seasons") */
+.has-video{position:relative;overflow:hidden;isolation:isolate}
+.section-video{position:absolute;inset:0;z-index:-1;width:100%;height:100%;object-fit:cover;opacity:.16;pointer-events:none}
+@media (forced-colors:active){.section-video{display:none}}
+
 /* Sponsor strip */
 .strip{padding:44px 0;border-bottom:1px solid var(--line)}
 .strip .wrap{display:flex;align-items:center;gap:40px;flex-wrap:wrap}
@@ -275,7 +280,11 @@ p{text-wrap:pretty}
 
 /* Seasons */
 .timeline{list-style:none}
-.timeline li{display:grid;grid-template-columns:132px minmax(0,1fr);gap:32px;padding:34px 0;border-top:1px solid var(--line-2)}
+.timeline li{display:grid;grid-template-columns:132px minmax(0,1fr) 128px;grid-template-areas:"year body logo";gap:32px;align-items:start;padding:34px 0;border-top:1px solid var(--line-2)}
+.timeline .year{grid-area:year}
+.timeline .season-body{grid-area:body}
+/* Each year's competition logo: the same size and column on every row, centred on the row */
+.season-logo{grid-area:logo;width:128px;height:128px;object-fit:contain;align-self:center;justify-self:end}
 .timeline .year{font-family:var(--num);font-size:2.2rem;font-weight:700;line-height:1;color:var(--deep);font-variant-numeric:tabular-nums}
 .timeline p{margin-top:8px;max-width:62ch}
 
@@ -328,7 +337,8 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
   .pool-band{padding:96px 0}
   .split{grid-template-columns:1fr;gap:36px}
   .photo-grid.g2,.photo-grid.g3{grid-template-columns:1fr}
-  .timeline li{grid-template-columns:1fr;gap:10px}
+  .timeline li{grid-template-columns:1fr auto;grid-template-areas:"year logo" "body body";gap:10px 16px;align-items:center}
+  .season-logo{width:72px;height:72px}
   .people,.people.lead{grid-template-columns:repeat(2,minmax(0,1fr));gap:28px 16px}
   .tiers{grid-template-columns:1fr}
   .footer-grid{grid-template-columns:1fr 1fr;gap:32px}
@@ -675,7 +685,10 @@ footer{background:var(--bg-2);border-top:1px solid var(--line)}
     </div>
   </section>
 
-  <section class="section alt">
+  <section class="section alt has-video">
+    <!-- A muted clip from the team video, faint behind the timeline (loaded only when it scrolls near) -->
+    <video class="section-video" data-src="seasons-loop.mp4" poster="seasons-poster.jpg" muted loop playsinline preload="none"
+      aria-hidden="true" tabindex="-1" disablepictureinpicture disableremoteplayback></video>
     <div class="wrap">
       <div class="section-head"><h2 class="h2">Our seasons</h2></div>
       <ol class="timeline" id="timeline-rows"></ol>
@@ -843,9 +856,9 @@ const values=[
   {title:'Design for real conditions',text:'We build for real underwater challenges, from autonomous navigation to precise manipulation.'},
 ];
 const timeline=[
-  {year:'2024',title:'Pioneer Class: 1st place, world championship',text:'In our first year, Crush Depth won the 2024 MATE ROV World Championship in the Pioneer Class, along with the Grover Award. Robert Voss received the Oceaneering ROV Co-Pilot Award. Our name is the maximum depth a vessel can withstand.'},
-  {year:'2025',title:'Explorer Class: our first year in the top division',text:"Our first year in the Explorer Class, the competition's most advanced division. We didn't win, but we pushed our technical limits and gained knowledge for the seasons ahead."},
-  {year:'2026',title:'Explorer Class: Best Marketing Display',text:'Back in the Explorer Class with refined systems, Crush Depth won the Best Marketing Display award for our branding, outreach and competition presence. Jack Jackson was named Engineering Presentation MVP for presenting our technical design to the judges.'},
+  {year:'2024',logo:'season-2024.webp',title:'Pioneer Class: 1st place, world championship',text:'In our first year, Crush Depth won the 2024 MATE ROV World Championship in the Pioneer Class, along with the Grover Award. Robert Voss received the Oceaneering ROV Co-Pilot Award. Our name is the maximum depth a vessel can withstand.'},
+  {year:'2025',logo:'season-2025.webp',title:'Explorer Class: our first year in the top division',text:"Our first year in the Explorer Class, the competition's most advanced division. We didn't win, but we pushed our technical limits and gained knowledge for the seasons ahead."},
+  {year:'2026',logo:'season-2026.webp',title:'Explorer Class: Best Marketing Display',text:'Back in the Explorer Class with refined systems, Crush Depth won the Best Marketing Display award for our branding, outreach and competition presence. Jack Jackson was named Engineering Presentation MVP for presenting our technical design to the judges.'},
 ];
 const impactRows=[
   {title:'Collaborate across disciplines',text:'We partner with clubs like MEDLIFE and programs like MESA to connect engineering with biology, medicine and community service.'},
@@ -955,7 +968,8 @@ function renderAll(){
   document.getElementById('about-values').innerHTML=itemList(values);
   document.getElementById('impact-rows').innerHTML=itemList(impactRows);
   document.getElementById('sponsor-benefit-rows').innerHTML=itemList(sponsorBenefits);
-  document.getElementById('timeline-rows').innerHTML=timeline.map(t=>`<li><div class="year">${esc(t.year)}</div><div><h3 class="h3">${esc(t.title)}</h3><p>${esc(t.text)}</p></div></li>`).join('');
+  // Each season: the year, what happened, and that year's MATE ROV Competition logo on the right.
+  document.getElementById('timeline-rows').innerHTML=timeline.map(t=>`<li><div class="year">${esc(t.year)}</div><div class="season-body"><h3 class="h3">${esc(t.title)}</h3><p>${esc(t.text)}</p></div>${t.logo?`<img class="season-logo" src="${esc(t.logo)}" alt="${esc(t.year)} MATE ROV Competition logo" width="256" height="256" loading="lazy" decoding="async">`:''}</li>`).join('');
   document.getElementById('subteams').innerHTML=subteamData.map(s=>`<div class="subteam" style="--c:${s.c}"><h3 class="h3">${esc(s.title)}</h3><p>${esc(s.desc)}</p><ul class="chip-row" style="margin-top:16px">${s.tags.map(t=>`<li class="chip">${esc(t)}</li>`).join('')}</ul></div>`).join('');
   document.getElementById('exec-lead').innerHTML=execData.slice(0,2).map(personCard).join('');
   document.getElementById('exec-rest').innerHTML=execData.slice(2).map(personCard).join('');
@@ -1006,7 +1020,30 @@ function setMotionPaused(paused){
   document.documentElement.classList.toggle('motion-paused',paused);
   document.querySelectorAll('.motion-btn').forEach(b=>{b.setAttribute('aria-pressed',String(paused));b.title=paused?'Play the animations':'Pause the animations'});
   if(window.setArtPaused)window.setArtPaused(paused);
+  if(window.syncSectionVideos)window.syncSectionVideos();
 }
+// ── Background videos: play only while on screen, and never with reduced motion, the animations
+//    paused, or Data Saver on (then the still poster frame shows instead). Nothing downloads until
+//    the section scrolls near. ──
+(function(){
+  const vids=[...document.querySelectorAll('.section-video')];
+  if(!vids.length||!('IntersectionObserver' in window))return;
+  const reduce=window.matchMedia('(prefers-reduced-motion: reduce)');
+  const saveData=!!(navigator.connection&&navigator.connection.saveData);
+  const near=new Set();
+  const sync=()=>vids.forEach(v=>{
+    const go=near.has(v)&&!reduce.matches&&!saveData&&!document.hidden&&!document.documentElement.classList.contains('motion-paused');
+    if(go){
+      if(!v.src){v.muted=true;v.src=v.dataset.src}
+      const p=v.play();if(p&&p.catch)p.catch(()=>{});
+    }else if(!v.paused)v.pause();
+  });
+  const io=new IntersectionObserver(es=>{es.forEach(e=>{const v=e.target.querySelector('.section-video');e.isIntersecting?near.add(v):near.delete(v)});sync()},{rootMargin:'200px 0px'});
+  vids.forEach(v=>io.observe(v.parentElement));
+  if(reduce.addEventListener)reduce.addEventListener('change',sync);
+  document.addEventListener('visibilitychange',sync);
+  window.syncSectionVideos=sync;
+})();
 document.addEventListener('click',e=>{const b=e.target.closest('.motion-btn');if(b)setMotionPaused(b.getAttribute('aria-pressed')!=='true')});
 
 const start=location.hash.slice(1)||'home';
