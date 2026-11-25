@@ -41,6 +41,18 @@ const entries = {
     } from 'firebase/firestore';
     export { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
   `,
+  // The public site's 3D ROV viewer (portal/js/rov-viewer.js): only what it uses, so the bundle stays small.
+  'three.js': `
+    export {
+      WebGLRenderer, Scene, PerspectiveCamera, Box3, Vector3, Color, PMREMGenerator, ACESFilmicToneMapping,
+      SRGBColorSpace, DirectionalLight, HemisphereLight, Mesh, PlaneGeometry, ShadowMaterial, Group, Sphere,
+      PCFSoftShadowMap, MathUtils, Spherical
+    } from 'three';
+    export { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    export { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    export { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    export { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+  `,
   'editor.js': `
     export { default as EditorJS } from '@editorjs/editorjs';
     export { default as Header } from '@editorjs/header';
