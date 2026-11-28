@@ -344,7 +344,20 @@ export function createFirebaseBackend(config) {
       const r = await addDoc(taskCol(spaceId), { ...data, spaceId, createdBy: me.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       return r.id;
     },
-    deleteTask: (task) => deleteDoc(doc(db, 'spaces', task.spaceId, 'tasks', task.id)),
+    // A main task goes with the subtasks listed in remove; those in detach stay as tasks of their own.
+    async deleteTask(task, { remove = [], detach = [] } = {}) {
+      const ref = (id) => doc(db, 'spaces', task.spaceId, 'tasks', id);
+      if (!remove.length && !detach.length) return deleteDoc(ref(task.id));
+      const batch = writeBatch(db);
+      batch.delete(ref(task.id));
+      remove.forEach((id) => batch.delete(ref(id)));
+      detach.forEach((id) => batch.update(ref(id), { parentId: null, updatedAt: serverTimestamp() }));
+      return batch.commit();
+    },
+    async getTask(spaceId, id) {
+      const s = await getDoc(doc(db, 'spaces', spaceId, 'tasks', id));
+      return s.exists() ? fromSnap(s) : null;
+    },
 
     // ── Audit log (leads and admins) ──
     async log(me, action, summary, target = {}) {

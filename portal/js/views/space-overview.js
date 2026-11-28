@@ -48,10 +48,11 @@ export function SpaceTasks({ space, canEdit }) {
       const [label, late] = dueLabel(t.due, t.status);
       const people = (t.assignees || []).map((uid) => members.find((m) => m.uid === uid)).filter(Boolean);
       const status = COLUMNS.find(([k]) => k === (t.status || 'todo'))?.[1] || 'To do';
+      const main = t.parentId && tasks.find((x) => x.id === t.parentId);
       return html`<li key=${t.id}>
         <i class=${'st-dot st-' + (t.status || 'todo')} title=${status}></i>
         <span class="grow"><a class="title" href=${href(`/s/${space.id}/board?task=${t.id}`)}>${t.priority === 'high' && html`<span class="prio-high" title="High priority">! </span>`}${t.title}</a>
-          <div class="meta">${status}${people.length ? ` · ${people.map((p) => p.name.split(' ')[0]).join(', ')}` : ' · Nobody yet'}</div></span>
+          <div class="meta">${status}${people.length ? ` · ${people.map((p) => p.name.split(' ')[0]).join(', ')}` : ' · Nobody yet'}${main ? ` · Part of ${main.title}` : ''}</div></span>
         <span class="avatars" aria-hidden="true">${people.slice(0, 3).map((p) => html`<${Avatar} key=${p.uid} person=${p} size=${24} />`)}</span>
         <span class=${'small nowrap due' + (late ? ' late' : '')}>${label}</span>
       </li>`;

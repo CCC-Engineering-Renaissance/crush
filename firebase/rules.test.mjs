@@ -200,6 +200,23 @@ test('people on a task can move it; others in a locked space can’t', async () 
 });
 
 // ── Private spaces ──
+test('subtasks sit under a main task on the same board, one level deep', async () => {
+  const main = { spaceId: 'open', title: 'Custom PCB', description: '', status: 'todo', assignees: [], due: null, priority: 'normal', labels: [], order: 1, createdBy: 'mem' };
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'spaces/open/tasks/pcb'), main);
+    await setDoc(doc(ctx.firestore(), 'spaces/open/tasks/schematic'), { ...main, title: 'Schematic', parentId: 'pcb' });
+    await setDoc(doc(ctx.firestore(), 'spaces/locked/tasks/far'), { ...main, spaceId: 'locked', title: 'Another board' });
+  });
+  const add = (extra) => addDoc(collection(as('mem'), 'spaces/open/tasks'), { ...main, title: 'Layout', ...extra });
+  await assertSucceeds(add({ parentId: 'pcb' }));
+  await assertSucceeds(add({ parentId: null }));
+  await assertFails(add({ parentId: 'nope' }));      // no such task
+  await assertFails(add({ parentId: 'schematic' })); // a subtask can't have subtasks
+  await assertFails(add({ parentId: 'far' }));       // only tasks on this board
+  await assertFails(updateDoc(doc(as('mem'), 'spaces/open/tasks/pcb'), { parentId: 'pcb' })); // not under itself
+  await assertSucceeds(updateDoc(doc(as('mem'), 'spaces/open/tasks/schematic'), { parentId: null }));
+});
+
 test('private spaces: only people let in read the outline, pages and tasks', async () => {
   // Every active member can list spaces (names only), so the sidebar knows what exists.
   await assertSucceeds(getDocs(collection(as('other'), 'spaces')));

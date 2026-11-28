@@ -428,6 +428,18 @@ test('a newly assigned task DMs each assignee once; tasks from before the bot, o
   assert.equal(world.props.dmt_t1, undefined, 'a deleted task is forgotten');
 });
 
+test('a subtask’s DM names the task it’s part of', () => {
+  const now = new Date();
+  world.docs.spaces = { s1: { name: 'electrical' } };
+  world.tasks = [{ id: 'pcb', spaceId: 's1', title: 'Custom PCB', status: 'doing', priority: 'high', assignees: ['u-priya'], createdBy: 'u-priya', updatedAt: now }];
+  bot.setup();
+  tick();
+  world.tasks.push({ id: 'layout', spaceId: 's1', parentId: 'pcb', title: 'Lay out the board', status: 'todo', priority: 'normal', assignees: ['u-sofia'], createdBy: 'u-priya', updatedAt: now });
+  tick();
+  assert.equal(world.dms.length, 1);
+  assert.match(world.dms[0].content, /^You have a new task on the portal: \*\*Lay out the board\*\* \(part of Custom PCB, #electrical\)\./);
+});
+
 test('someone clocked in past the session limit gets one DM per session; blocked DMs are noted once', () => {
   const now = Date.now(), hour = 3600e3;
   world.settings = { maxSessionHours: 8 };

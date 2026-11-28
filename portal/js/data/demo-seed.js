@@ -257,8 +257,10 @@ export function buildSeed() {
   // ── Tasks ──
   const tasks = {};
   let tn = 0;
-  const task = (spaceId, title, status, assignees, dueIn, priority = 'normal', description = '') => {
-    tasks['tk-' + (++tn)] = { spaceId, title, description, status, assignees, due: dueIn == null ? null : isoDate(addDays(today, dueIn)), priority, labels: [], order: tn, createdBy: 'u-alex', createdAt: addDays(now, -10), updatedAt: addDays(now, -tn % 4), completedAt: status === 'done' ? addDays(now, -1) : null };
+  const task = (spaceId, title, status, assignees, dueIn, priority = 'normal', description = '', parentId = null) => {
+    const key = 'tk-' + (++tn);
+    tasks[key] = { spaceId, title, description, status, assignees, due: dueIn == null ? null : isoDate(addDays(today, dueIn)), priority, labels: [], order: tn, createdBy: 'u-alex', createdAt: addDays(now, -10), updatedAt: addDays(now, -tn % 4), completedAt: status === 'done' ? addDays(now, -1) : null, parentId };
+    return key;
   };
   task('cd-leads', 'Freeze the thruster layout', 'doing', ['u-marcus', 'u-priya'], 3, 'high', 'Decide between 4+2 vectored and 6 vertical before the design review.');
   task('cd-mgmt', 'Book the pool for two more Saturdays', 'todo', ['u-alex'], 6);
@@ -275,7 +277,13 @@ export function buildSeed() {
   task('cd-controls', 'Tune depth-hold PID', 'doing', ['u-priya', 'u-liam'], 4, 'high');
   task('cd-controls', 'Update joystick mapping docs', 'done', ['u-liam'], -2);
   task('cd-electrical', 'Crimp new tether connectors', 'todo', ['u-jordan'], 8);
-  task('cd-electrical', 'Wire the ESC power distribution board', 'doing', ['u-jordan', 'u-zoe'], 2, 'high', 'Six ESCs off the 12 V bus, each on its own fuse.');
+  task('cd-electrical', 'Mount the ESCs on the electronics tray', 'doing', ['u-jordan', 'u-zoe'], 2, 'high', 'Six ESCs off the 12 V bus, each on its own fuse.');
+  const pcb = task('cd-electrical', 'Custom power distribution PCB', 'doing', ['u-jordan', 'u-zoe'], 18, 'high', 'Replaces the hand-wired fuse block: six fused ESC outputs, a 5 V rail for the Pi, and current sensing on the main bus.');
+  task('cd-electrical', 'Draw the schematic', 'done', ['u-jordan'], -4, 'normal', '', pcb);
+  task('cd-electrical', 'Lay out the board in KiCad', 'doing', ['u-zoe'], 3, 'normal', '', pcb);
+  task('cd-electrical', 'Order the boards and parts', 'todo', ['u-alex'], 7, 'normal', 'Boards from JLCPCB, parts from DigiKey. Use the club card.', pcb);
+  task('cd-electrical', 'Solder the first board', 'todo', ['u-zoe'], 12, 'normal', '', pcb);
+  task('cd-electrical', 'Test it at full thruster load', 'todo', [], 16, 'normal', '', pcb);
   task('cd-electrical', 'Pot the tether penetrators', 'todo', ['u-zoe'], -1);
   task('cd-electrical', 'Order fuses and Anderson connectors', 'blocked', ['u-jordan'], 4, 'normal', 'Waiting on the October receipts before the next order.');
   task('cd-electrical', 'Label every connector on the electronics tray', 'todo', [], 11);

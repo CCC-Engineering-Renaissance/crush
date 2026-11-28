@@ -35,6 +35,12 @@ export function MyTasks() {
   const [tick, setTick] = useState(0);
   const res = useAsync(() => api.listMyTasks(profile.uid, spaceIds ? spaceIds.split(',') : []), [api, profile.uid, tick, spaceIds]);
   const tasks = res.data || [];
+  // A subtask shows its main task's name, which may not be on this list
+  const parents = useAsync(async () => {
+    const need = [...new Set(tasks.filter((t) => t.parentId).map((t) => `${t.spaceId}/${t.parentId}`))];
+    const got = await Promise.all(need.map((k) => api.getTask(...k.split('/')).catch(() => null)));
+    return Object.fromEntries(got.filter(Boolean).map((t) => [t.id, t]));
+  }, [api, res.data]);
   const today = isoDate(new Date()), weekOut = isoDate(addDays(new Date(), 7));
   const groups = [
     ['Overdue', tasks.filter((t) => t.status !== 'done' && t.due && t.due < today)],
@@ -56,7 +62,7 @@ export function MyTasks() {
               <button class="btn btn-sm btn-icon btn-quiet" aria-label=${t.status === 'done' ? 'Mark not done' : 'Mark done'} title=${t.status === 'done' ? 'Mark not done' : 'Mark done'}
                 onClick=${async () => { try { await api.saveTask({ id: t.id, spaceId: t.spaceId, status: t.status === 'done' ? 'todo' : 'done', order: t.order, completedAt: t.status === 'done' ? null : new Date() }, profile, { assigneeOnly: true }); setTick(tick + 1); } catch (e) { toastError(e); } }}>
                 <${Icon} name=${t.status === 'done' ? 'check' : 'tasks'} size=${20} /></button>
-              <span class="grow"><a class="title" href=${href(`/s/${t.spaceId}/board?task=${t.id}`)} style=${t.status === 'done' ? 'text-decoration:line-through;color:var(--text-3)' : ''}>${t.title}</a>
+              <span class="grow"><a class="title" href=${href(`/s/${t.spaceId}/board?task=${t.id}`)} style=${t.status === 'done' ? 'text-decoration:line-through;color:var(--text-3)' : ''}>${parents.data?.[t.parentId] && html`<span class="muted" style="font-weight:500">${parents.data[t.parentId].title} › </span>`}${t.title}</a>
                 <div class="meta">${sp ? `#${spaceLabel(sp)}` : ''}${t.status !== 'todo' && t.status !== 'done' ? `, ${COLUMNS.find(([k]) => k === t.status)?.[1]}` : ''}</div></span>
               ${d && html`<span class="small nowrap" style=${d[1] ? 'color:var(--bad);font-weight:700' : 'color:var(--text-3)'}>${d[0]}</span>`}
             </li>`;
@@ -73,6 +79,7 @@ export function Board({ spaceId }) {
   const members = useMembers();
   const [tasks, setTasks] = useState(null);
   const [mine, setMine] = useState(false);
+  const [subCards, setSubCards] = useState(false);
   const [q, setQ] = useState('');
   const [dragId, setDragId] = useState(null);
   const [over, setOver] = useState(null);
@@ -92,7 +99,19 @@ export function Board({ spaceId }) {
 
   if (!space) return html`<div class="content"><${Empty} title="This space doesn’t exist">It may have been deleted.</${Empty}></div>`;
   if (!allowed) return html`<div class="content"><${NoAccess} space=${space} /></div>`;
-  const shown = (tasks || []).filter((t) => (!mine || t.assignees?.includes(profile.uid)) && (!q || t.title.toLowerCase().includes(q.toLowerCase())));
+  // Subtasks live inside their main task's card unless "As cards" is on. "Mine" always shows the
+  // ones assigned to you. A subtask whose main task is gone counts as a main task.
+  const all = tasks || [];
+  const byId = new Map(all.map((t) => [t.id, t]));
+  const parentOf = (t) => (t.parentId && byId.get(t.parentId)) || null;
+  const kids = {};
+  all.forEach((t) => { if (parentOf(t)) (kids[t.parentId] ||= []).push(t); });
+  const hit = (t) => !q || t.title.toLowerCase().includes(q.toLowerCase());
+  const shown = all.filter((t) => {
+    const mineOk = !mine || t.assignees?.includes(profile.uid);
+    if (parentOf(t)) return (subCards || mine) && mineOk && hit(t);
+    return mineOk && (hit(t) || (kids[t.id] || []).some(hit));
+  });
 
   const move = async (t, status) => {
     if (t.status === status) return;
@@ -110,6 +129,7 @@ export function Board({ spaceId }) {
       <div class="actions">
         <div class="search" style="width:220px"><${Icon} name="search" /><input class="input" type="search" placeholder="Find a task" value=${q} onInput=${(e) => setQ(e.target.value)} /></div>
         <${Seg} label="Show" value=${mine ? 'mine' : 'all'} onChange=${(v) => setMine(v === 'mine')} options=${[['all', 'Everyone'], ['mine', 'Mine']]} />
+        ${Object.keys(kids).length > 0 && html`<${Seg} label="Subtasks" value=${subCards ? 'cards' : 'inside'} onChange=${(v) => setSubCards(v === 'cards')} options=${[['inside', 'Inside their task'], ['cards', 'As cards']]} />`}
       </div>
     </div>
     ${!tasks ? html`<${Loading} />` : html`<div class="board">
@@ -121,7 +141,7 @@ export function Board({ spaceId }) {
           onDrop=${(e) => { e.preventDefault(); setOver(null); const t = (tasks || []).find((x) => x.id === dragId); setDragId(null); if (t) move(t, key); }}>
           <div class="column-head">${label}<span class="n">${list.length}</span></div>
           ${canEdit && html`<${QuickAdd} spaceId=${spaceId} status=${key} />`}
-          ${list.map((t) => html`<${Card} key=${t.id} t=${t} members=${members} dragging=${dragId === t.id}
+          ${list.map((t) => html`<${Card} key=${t.id} t=${t} members=${members} dragging=${dragId === t.id} parent=${parentOf(t)} kids=${kids[t.id]}
             draggable=${canEdit || t.assignees?.includes(profile.uid)} onDragStart=${() => setDragId(t.id)} onDragEnd=${() => { setDragId(null); setOver(null); }} spaceId=${spaceId} />`)}
           ${!list.length && html`<p class="tiny muted" style="padding:4px 6px;margin:0">${key === 'done' ? 'Finished work lands here.' : 'Nothing here.'}</p>`}
         </section>`;
@@ -130,13 +150,16 @@ export function Board({ spaceId }) {
   </div>`;
 }
 
-function Card({ t, members, dragging, draggable, onDragStart, onDragEnd, spaceId }) {
+function Card({ t, members, dragging, draggable, onDragStart, onDragEnd, spaceId, parent, kids }) {
   const d = dueLabel(t.due, t.status);
+  const done = (kids || []).filter((k) => k.status === 'done').length;
   const people = (t.assignees || []).map((uid) => members.find((m) => m.uid === uid) || { uid, name: '?' });
   return html`<button class=${'task' + (dragging ? ' dragging' : '')} draggable=${draggable ? 'true' : 'false'}
     onDragStart=${(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); onDragStart(); }} onDragEnd=${onDragEnd}
     onClick=${() => openTask(t, spaceId)}>
+    ${parent && html`<span class="t-parent">Part of ${parent.title}</span>`}
     <span class="t">${t.priority === 'high' && html`<span class="prio-high" title="High priority">! </span>`}${t.title}</span>
+    ${kids?.length > 0 && html`<span class="t-progress"><span class="bar" aria-hidden="true"><i style=${`width:${Math.round((done / kids.length) * 100)}%`}></i></span>${done} of ${kids.length} subtasks done</span>`}
     <span class="foot">
       ${d && html`<span class=${'due' + (d[1] && t.status !== 'done' ? ' late' : '')}>${d[0]}</span>`}
       <span class="spacer"></span>
@@ -168,41 +191,92 @@ function TaskEditor({ task, spaceId, close }) {
   const space = useStore((s) => s.spaces.find((x) => x.id === spaceId));
   const members = useMembers();
   const canEdit = canSeeSpace(space, profile) && (isLead(profile) || !!space?.memberEdit);
-  const [f, setF] = useState({ title: task.title, description: task.description || '', status: task.status, assignees: task.assignees || [], due: task.due || '', priority: task.priority || 'normal' });
+  // The board, live: this task's subtasks, its main task and the "Part of" choices
+  const [board, setBoard] = useState([]);
+  useEffect(() => api.watchTasks(spaceId, setBoard, () => setBoard([])), [api, spaceId]);
+  const subs = board.filter((x) => x.parentId === task.id).sort((a, b) => (a.order || 0) - (b.order || 0));
+  const parent = board.find((x) => x.id === task.parentId) || null;
+  const mains = board.filter((x) => x.id !== task.id && !x.parentId).sort((a, b) => a.title.localeCompare(b.title));
+  const [f, setF] = useState({ title: task.title, description: task.description || '', status: task.status, assignees: task.assignees || [], due: task.due || '', priority: task.priority || 'normal', parentId: task.parentId || '' });
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [newSub, setNewSub] = useState('');
+  const mayDelete = (t) => isLead(profile) || (canEdit && t.createdBy === profile.uid);
+  const switchTo = (t) => { close(); openTask(t, spaceId); };
   const save = async () => {
     if (!f.title.trim()) return;
     setBusy(true);
     try {
-      if (canEdit) await api.saveTask({ id: task.id, spaceId, title: f.title.trim(), description: f.description.trim(), status: f.status, assignees: f.assignees, due: f.due || null, priority: f.priority, labels: task.labels || [], order: task.order || Date.now(), completedAt: f.status === 'done' ? (task.completedAt || new Date()) : null }, profile);
+      if (canEdit) await api.saveTask({ id: task.id, spaceId, title: f.title.trim(), description: f.description.trim(), status: f.status, assignees: f.assignees, due: f.due || null, priority: f.priority, labels: task.labels || [], order: task.order || Date.now(), completedAt: f.status === 'done' ? (task.completedAt || new Date()) : null, parentId: subs.length ? null : (f.parentId || null) }, profile);
       else await api.saveTask({ id: task.id, spaceId, status: f.status, order: task.order || Date.now(), completedAt: f.status === 'done' ? new Date() : null }, profile, { assigneeOnly: true });
       toast('Task saved.'); close();
     } catch (e) { toastError(e); setBusy(false); }
   };
   const remove = async () => {
-    if (!(await confirmDialog({ title: 'Delete this task?', body: `“${task.title}” will be removed from the board.`, confirmLabel: 'Delete task', danger: true }))) return;
-    try { await api.deleteTask({ id: task.id, spaceId }); toast('Task deleted.'); close(); } catch (e) { toastError(e); }
+    const n = subs.length;
+    const body = n ? `“${task.title}” and its ${n === 1 ? 'subtask' : n + ' subtasks'} will be removed from the board.` : `“${task.title}” will be removed from the board.`;
+    if (!(await confirmDialog({ title: 'Delete this task?', body, confirmLabel: 'Delete task', danger: true }))) return;
+    // Subtasks you couldn't delete on their own stay on the board as tasks of their own
+    const keep = subs.filter((x) => !mayDelete(x));
+    try {
+      await api.deleteTask({ id: task.id, spaceId }, { remove: subs.filter(mayDelete).map((x) => x.id), detach: keep.map((x) => x.id) });
+      toast(keep.length ? `Task deleted. ${keep.length === 1 ? 'One subtask was' : keep.length + ' subtasks were'} made by someone else, so ${keep.length === 1 ? 'it stays' : 'they stay'} as a task of ${keep.length === 1 ? 'its' : 'their'} own.` : 'Task deleted.');
+      close();
+    } catch (e) { toastError(e); }
   };
-  const canDelete = isLead(profile) || (canEdit && task.createdBy === profile.uid);
+  const toggleSub = async (x) => {
+    try { await api.saveTask({ id: x.id, spaceId, status: x.status === 'done' ? 'todo' : 'done', order: x.order || Date.now(), completedAt: x.status === 'done' ? null : new Date() }, profile, { assigneeOnly: !canEdit }); }
+    catch (e) { toastError(e); }
+  };
+  const addSub = async () => {
+    const title = newSub.trim();
+    if (!title) return;
+    try {
+      await api.saveTask({ spaceId, title, description: '', status: 'todo', assignees: [], due: null, priority: 'normal', labels: [], order: Date.now(), completedAt: null, parentId: task.id }, profile);
+      setNewSub('');
+    } catch (e) { toastError(e); }
+  };
+  const canDelete = mayDelete(task);
   const canMove = canEdit || (task.assignees || []).includes(profile.uid);
   const memberOpts = members.slice().sort((a, b) => a.name.localeCompare(b.name)).map((m) => ({ value: m.uid, label: m.name }));
-  return html`<${Modal} title=${canEdit ? 'Task' : task.title} onClose=${close} wide
+  const person = (uid) => members.find((m) => m.uid === uid) || { uid, name: '?' };
+  const doneN = subs.filter((x) => x.status === 'done').length;
+  return html`<${Modal} title=${canEdit ? (task.parentId ? 'Subtask' : 'Task') : task.title} onClose=${close} wide
     footer=${html`${canDelete && html`<button class="btn btn-danger left" onClick=${remove}><${Icon} name="trash" />Delete</button>`}
       ${canMove ? html`<button class="btn" onClick=${close}>Cancel</button><button class="btn btn-primary" onClick=${save} disabled=${busy}>Save task</button>` : html`<button class="btn" onClick=${close}>Close</button>`}`}>
+    ${parent && html`<p class="small" style="margin:0 0 14px">Part of <button class="link-btn" onClick=${() => switchTo(parent)}>${parent.title}</button></p>`}
     <div class="form-grid">
       ${canEdit && html`<${Field} label="Title" full><input class="input" value=${f.title} maxlength="200" onInput=${(e) => setF({ ...f, title: e.target.value })} /></${Field}>`}
       <${Field} label="Status"><select class="select" value=${f.status} disabled=${!canMove} onChange=${(e) => setF({ ...f, status: e.target.value })}>${COLUMNS.map(([k, l]) => html`<option value=${k} key=${k}>${l}</option>`)}</select></${Field}>
       <${Field} label="Due date"><input class="input" type="date" value=${f.due} disabled=${!canEdit} onInput=${(e) => setF({ ...f, due: e.target.value })} /></${Field}>
       <div class="field"><span>Assigned to</span>${canEdit ? html`<${MultiSelect} options=${memberOpts} value=${f.assignees} onChange=${(v) => setF({ ...f, assignees: v.slice(0, 12) })} allLabel="Nobody yet" searchable />`
-        : html`<div class="avatars">${f.assignees.map((uid) => html`<${Avatar} key=${uid} person=${members.find((m) => m.uid === uid) || { uid, name: '?' }} size=${28} />`)}</div>`}</div>
+        : html`<div class="avatars">${f.assignees.map((uid) => html`<${Avatar} key=${uid} person=${person(uid)} size=${28} />`)}</div>`}</div>
       <${Field} label="Priority"><select class="select" value=${f.priority} disabled=${!canEdit} onChange=${(e) => setF({ ...f, priority: e.target.value })}>${Object.entries(PRIORITY).map(([k, l]) => html`<option value=${k} key=${k}>${l}</option>`)}</select></${Field}>
+      ${canEdit && !subs.length && (mains.length > 0 || f.parentId) && html`<${Field} label="Part of" hint="Put this under a bigger task, as one of its steps.">
+        <select class="select" value=${f.parentId} onChange=${(e) => setF({ ...f, parentId: e.target.value })}>
+          <option value="">Nothing. It’s a main task</option>${mains.map((m) => html`<option key=${m.id} value=${m.id}>${m.title}</option>`)}</select></${Field}>`}
       <div class="field full"><span>Details</span>
         ${canEdit && (editing || !f.description)
           ? html`<textarea class="textarea" value=${f.description} maxlength="4000" placeholder="What does done look like? Links, part numbers, drawings…" onInput=${(e) => setF({ ...f, description: e.target.value })}></textarea>`
           : html`<div class="panel panel-pad" style="padding:12px 14px" onDblClick=${() => canEdit && setEditing(true)}>${f.description ? html`<${Markdown} text=${f.description} />` : html`<span class="muted">No details.</span>`}
               ${canEdit && html`<div><button class="link-btn small" onClick=${() => setEditing(true)}>Edit details</button></div>`}</div>`}
       </div>
+      ${!task.parentId && (subs.length > 0 || canEdit) && html`<div class="field full"><span>Subtasks${subs.length > 0 && html` <span class="muted" style="font-weight:500">${doneN} of ${subs.length} done</span>`}</span>
+        ${subs.length > 0 && html`<ul class="subtasks">${subs.map((x) => {
+          const d = dueLabel(x.due, x.status);
+          const mine = canEdit || (x.assignees || []).includes(profile.uid);
+          const st = x.status === 'doing' || x.status === 'blocked' ? COLUMNS.find(([k]) => k === x.status)[1] : '';
+          return html`<li key=${x.id} class=${x.status === 'done' ? 'done' : ''}>
+            <input type="checkbox" checked=${x.status === 'done'} disabled=${!mine} aria-label=${'Done: ' + x.title} onChange=${() => toggleSub(x)} />
+            <button class="link-btn sub-title" onClick=${() => switchTo(x)}>${x.title}</button>
+            ${st && html`<span class=${'tiny nowrap' + (x.status === 'blocked' ? ' late' : ' muted')}>${st}</span>`}
+            <span class="avatars" aria-hidden="true">${(x.assignees || []).slice(0, 3).map((uid) => html`<${Avatar} key=${uid} person=${person(uid)} size=${22} />`)}</span>
+            ${d && html`<span class=${'tiny nowrap' + (d[1] ? ' late' : ' muted')}>${d[0]}</span>`}
+          </li>`;
+        })}</ul>`}
+        ${canEdit && html`<input class="input" value=${newSub} maxlength="200" placeholder="Add a subtask, then press Enter" aria-label="New subtask"
+          onInput=${(e) => setNewSub(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') { e.preventDefault(); addSub(); } }} />`}
+      </div>`}
     </div>
     <p class="tiny muted" style="margin:12px 0 0">Created ${relTime(task.createdAt)}${task.updatedAt ? `, updated ${relTime(task.updatedAt)}` : ''}</p>
   </${Modal}>`;

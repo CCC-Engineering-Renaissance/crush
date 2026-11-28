@@ -309,6 +309,15 @@ service cloud.firestore {
         && (d.due == null || str(d.due, 10, 10));
     }
 
+    // A subtask's main task: another task on the same board that isn't a subtask itself, so tasks
+    // nest one level deep at most.
+    function validParent(spaceId, taskId, d) {
+      return !('parentId' in d) || d.parentId == null
+        || (str(d.parentId, 1, 64) && d.parentId != taskId
+            && exists(/databases/$(database)/documents/spaces/$(spaceId)/tasks/$(d.parentId))
+            && get(/databases/$(database)/documents/spaces/$(spaceId)/tasks/$(d.parentId)).data.get('parentId', null) == null);
+    }
+
     // A space's icon: an emoji, or a small picture the portal shrank and kept in the document
     // itself as a PNG, JPEG or WebP data: URL (so no file storage is needed, and no outside links).
     function validSpaceIcon(d) {
@@ -331,11 +340,12 @@ service cloud.firestore {
       match /tasks/{taskId} {
         allow read: if canSeeSpace(spaceId);
         allow create: if canEditSpace(spaceId) && incoming().spaceId == spaceId
-          && incoming().createdBy == uid() && validTask(incoming());
+          && incoming().createdBy == uid() && validTask(incoming()) && validParent(spaceId, taskId, incoming());
         allow update: if canSeeSpace(spaceId)
           && incoming().spaceId == existing().spaceId
           && incoming().createdBy == existing().createdBy
           && validTask(incoming())
+          && (incoming().get('parentId', null) == existing().get('parentId', null) || validParent(spaceId, taskId, incoming()))
           && (canEditSpace(spaceId)
               || (uid() in existing().assignees && onlyChanged(['status', 'order', 'updatedAt', 'completedAt'])));
         allow delete: if (lead() && canSeeSpace(spaceId))

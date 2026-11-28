@@ -603,7 +603,9 @@ function sessionLimitHours_(cfg) {
 function newTasks_(cfg, dm, props, now) {
   var first = !props.getProperty('DM_TASKS_SINCE');
   var all = props.getProperties(), keep = {}, spaces = null;
-  allTasks_(cfg).forEach(function (t) {
+  var tasks = allTasks_(cfg), byId = {};
+  tasks.forEach(function (t) { byId[t.id] = t; });
+  tasks.forEach(function (t) {
     var key = 'dmt_' + t.id;
     var updated = t.updatedAt instanceof Date ? t.updatedAt.getTime() : 0;
     var assignees = (t.assignees || []).filter(Boolean);
@@ -615,8 +617,8 @@ function newTasks_(cfg, dm, props, now) {
     assignees.filter(function (uid) { return told.indexOf(uid) < 0; }).forEach(function (uid) {
       if (first || !recent || uid === t.createdBy) { told.push(uid); return; }
       if (!spaces) { spaces = {}; listDocs_(cfg, 'spaces').forEach(function (sp) { spaces[sp.id] = sp; }); }
-      var space = spaces[t.spaceId];
-      var about = [space && space.name ? '#' + space.name : '', t.due ? 'due ' + dueDate_(t.due) : '',
+      var space = spaces[t.spaceId], main = t.parentId && byId[t.parentId];
+      var about = [main ? 'part of ' + clip_(main.title || 'Untitled', 80) : '', space && space.name ? '#' + space.name : '', t.due ? 'due ' + dueDate_(t.due) : '',
         t.priority === 'high' ? 'high priority' : ''].filter(Boolean);
       var text = 'You have a new task on the portal: **' + clip_(t.title || 'Untitled', 200) + '**'
         + (about.length ? ' (' + about.join(', ') + ')' : '') + '. Your tasks: ' + cfg.portalUrl + '#/tasks';

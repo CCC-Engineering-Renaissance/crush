@@ -4,7 +4,7 @@ import { buildSeed, PERSONAS, VISITOR, SPACE_ICONS } from './demo-seed.js';
 import { descendants } from './tree.js';
 
 // Bumped whenever the sample data changes shape, so every browser starts over with the new set.
-const KEY = 'er-portal-demo-v5';
+const KEY = 'er-portal-demo-v6';
 const PERSONA_KEY = 'er-portal-demo-persona';
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 
@@ -250,7 +250,13 @@ export function createDemoBackend() {
       emit('tasks');
       return key;
     },
-    async deleteTask(task) { await wait(); delete coll('tasks')[task.id]; emit('tasks'); },
+    async deleteTask(task, { remove = [], detach = [] } = {}) {
+      await wait();
+      [task.id, ...remove].forEach((id) => { delete coll('tasks')[id]; });
+      detach.forEach((id) => patch('tasks', id, { parentId: null, updatedAt: new Date() }));
+      emit('tasks');
+    },
+    async getTask(spaceId, id) { await wait(40); return rows('tasks').find((t) => t.id === id && t.spaceId === spaceId) || null; },
 
     async log(me, action, summary, target = {}) { put('audit', uid('au'), { at: new Date(), actorUid: me.uid, actorName: me.name, action, summary, targetType: target.type || null, targetId: target.id || null }); persist(); },
     async listAudit() { await wait(); return rows('audit').sort((a, b) => b.at - a.at); },
