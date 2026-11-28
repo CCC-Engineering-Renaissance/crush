@@ -84,6 +84,7 @@ export function buildSeed() {
     ['u-hannah', 'Hannah Okafor', 'lead', 'Director of Marketing', ['cd-marketing'], 'Business Administration', 'she/her', ['cd-leads', 'cd-mgmt']],
     ['u-sofia', 'Sofia Delgado', 'member', '', ['cd-chassis'], 'Mechanical Engineering', 'she/her', []],
     ['u-jordan', 'Jordan Kim', 'member', '', ['cd-electrical'], 'Electrical Engineering', 'they/them', []],
+    ['u-zoe', 'Zoe Park', 'member', '', ['cd-electrical'], 'Electrical Engineering', 'she/her', []],
     ['u-emily', 'Emily Chen', 'member', '', ['cd-marketing'], 'Graphic Design', 'she/her', []],
     ['u-diego', 'Diego Ramirez', 'member', '', ['cd-float'], 'Civil Engineering', 'he/him', []],
     ['u-ethan', 'Ethan Brooks', 'member', '', ['pr-signal'], 'Computer Engineering', 'he/him', []],
@@ -125,6 +126,7 @@ export function buildSeed() {
   events['ev-outreach'] = { title: 'Robotics demo for 7th graders', type: 'outreach', start: at(addDays(weekStart, 9), 13), end: at(addDays(weekStart, 9), 15), location: 'Partner middle school', description: 'Bring the 2024 Pioneer ROV and the demo tank.', subteams: ['cd-marketing'] };
   events['ev-fund'] = { title: 'Sponsor thank-you night', type: 'social', start: at(addDays(weekStart, 17), 18), end: at(addDays(weekStart, 17), 20), location: 'Student Center', description: 'Thank our sponsors with a showcase of the 2026 vehicle.', subteams: ['cd-marketing'] };
   events['ev-build'] = { title: 'Build day: frame v3', type: 'build', start: at(addDays(weekStart, 1), 14), end: at(addDays(weekStart, 1), 17), location: 'Fab lab', description: 'Cutting and tapping the new frame plates.', subteams: ['cd-chassis'] };
+  events['ev-solder'] = { title: 'Electrical: tether soldering session', type: 'build', start: at(addDays(weekStart, 10), 15), end: at(addDays(weekStart, 10), 17), location: 'Engineering lab', description: 'New connectors on the tether. Bring an iron if you have one.', subteams: ['cd-electrical'] };
   events['ev-eeg'] = { title: 'Prosthetic: first EEG recording session', type: 'build', start: at(addDays(weekStart, 3), 15), end: at(addDays(weekStart, 3), 17), location: 'Bio lab', description: 'Baseline recordings with the new headset.', subteams: ['pr-electrical', 'pr-signal'] };
 
   // ── Time entries ──
@@ -273,6 +275,12 @@ export function buildSeed() {
   task('cd-controls', 'Tune depth-hold PID', 'doing', ['u-priya', 'u-liam'], 4, 'high');
   task('cd-controls', 'Update joystick mapping docs', 'done', ['u-liam'], -2);
   task('cd-electrical', 'Crimp new tether connectors', 'todo', ['u-jordan'], 8);
+  task('cd-electrical', 'Wire the ESC power distribution board', 'doing', ['u-jordan', 'u-zoe'], 2, 'high', 'Six ESCs off the 12 V bus, each on its own fuse.');
+  task('cd-electrical', 'Pot the tether penetrators', 'todo', ['u-zoe'], -1);
+  task('cd-electrical', 'Order fuses and Anderson connectors', 'blocked', ['u-jordan'], 4, 'normal', 'Waiting on the October receipts before the next order.');
+  task('cd-electrical', 'Label every connector on the electronics tray', 'todo', [], 11);
+  task('cd-electrical', 'Draw the wiring diagram as a portal page', 'doing', ['u-jordan'], null);
+  task('cd-electrical', 'Load-test the 12 V buck converter', 'done', ['u-zoe'], -3);
   task('pr-electrical', 'Solder the EEG amplifier board', 'doing', ['u-chloe'], 6);
   task('pr-signal', 'Record a baseline EEG session', 'todo', ['u-ethan', 'u-priya'], 3);
   task('pr-mechanical', 'Print finger linkages v1', 'todo', ['u-noah'], 9);

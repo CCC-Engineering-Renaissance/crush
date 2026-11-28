@@ -10,14 +10,14 @@ import { NoAccess } from './spaces.js';
 export const COLUMNS = [['todo', 'To do'], ['doing', 'In progress'], ['blocked', 'Blocked'], ['done', 'Done']];
 const PRIORITY = { high: 'High', normal: 'Normal', low: 'Low' };
 
-function useMembers() {
+export function useMembers() {
   const api = useStore((s) => s.api);
   const cached = useStore((s) => s.membersCache);
   useEffect(() => { if (!getState().membersCache) api.listMembers().then((m) => setState({ membersCache: m })).catch(() => {}); }, [api]);
   return cached || [];
 }
 
-const dueLabel = (due, status) => {
+export const dueLabel = (due, status) => {
   if (!due) return null;
   if (status === 'done') return ['Was due ' + fmtShortDate(parseIsoDate(due)), false];
   const today = isoDate(new Date());

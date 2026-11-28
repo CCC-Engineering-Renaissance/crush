@@ -1,4 +1,5 @@
 // Spaces and pages: a Notion-style tree of pages per space, each space with a Drive folder and a task board.
+// A space's home also sums up its tasks and its subteam (space-overview.js).
 import { html, useState, useEffect, useRef, useMemo, Icon, Avatar, Modal, openModal, Field, Menu, Loading, Empty, Notice, useAsync, toast, toastError, confirmDialog, EmojiPicker, ItemIcon } from '../lib/ui.js';
 import { useStore, setState, isLead, isAdmin, getState, bump, canSeeSpace, visibleSpaces, groupBySubsidiary, subsidiaryById, subteamById, subteamLabel, treeOf } from '../lib/store.js';
 import { useRoute, href, go } from '../lib/router.js';
@@ -8,6 +9,7 @@ import { BlocksView, EditorHost, DriveBlock, toggleChecklist } from './editor.js
 import { driveConfigured, pickFromDrive, parseDriveLink } from '../google/drive.js';
 import { useTitle, SpaceIcon } from './common.js';
 import { openIconPicker } from './space-icon.js';
+import { SpaceTasks, SpaceTeam } from './space-overview.js';
 
 const canEditSpace = (space, profile) => canSeeSpace(space, profile) && (isLead(profile) || !!space?.memberEdit);
 const useTree = (spaceId) => useStore((s) => treeOf(spaceId, s));
@@ -72,17 +74,28 @@ export function SpaceHome({ spaceId }) {
     </div>
     ${space.private && html`<p class="small muted row" style="margin-top:-12px;gap:6px"><${Icon} name="lock" size=${15} />Private: only people an admin adds can open this space.</p>`}
     ${!editable && html`<p class="small muted" style="margin-top:${space.private ? '-6px' : '-12px'}">Leads edit the pages in this space.</p>`}
-    <div class="grid-2" style="align-items:start">
+    <div class="space-layout">
+      <div class="stack">
+      <${SpaceTasks} space=${space} canEdit=${editable} />
       <section class="panel">
         <div class="panel-head"><h2>Pages</h2><span class="small muted">${treeList.length}</span></div>
         <div class="panel-body">${!content ? html`<${Loading} />` : tree.length ? html`<${PageTree} nodes=${tree} depth=${0} />` : html`<p class="muted" style="margin:6px 0">${editable ? 'No pages yet. Start with meeting notes or a how-to.' : 'No pages yet.'}</p>`}</div>
       </section>
+      </div>
+      <div class="stack">
+      <${SpaceTeam} space=${space} />
+      ${!subteamById(space.subteamId) && isLead(profile) && html`<section class="panel">
+        <div class="panel-head"><h2>Link a subteam</h2></div>
+        <div class="panel-body"><p class="muted" style="margin:4px 0 12px">Link this space to its subteam to show the team’s upcoming events, who’s working on it now and who’s on it.</p>
+          <button class="btn" onClick=${() => openSpaceSettings(space)}><${Icon} name="sliders" />Space settings</button></div>
+      </section>`}
       <section class="panel">
         <div class="panel-head"><h2>Google Drive folder</h2>${isLead(profile) && html`<button class="link-btn small" onClick=${() => openSpaceSettings(space)}>${folder ? 'Change' : 'Link a folder'}</button>`}</div>
         <div class="panel-body">${folder
           ? html`<${DriveBlock} file=${{ ...folder, mimeType: 'application/vnd.google-apps.folder', demo: folder.id?.startsWith('demo-') }} folder />`
           : html`<p class="muted" style="margin:6px 0">${isLead(profile) ? 'Link the shared Drive folder this team keeps its files in.' : 'No folder linked yet.'}</p>`}</div>
       </section>
+      </div>
     </div>
   </div>`;
 }
